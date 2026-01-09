@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"gexec-sandbox/internal/api"
+	"gexec-sandbox/internal/sandbox"
 )
 
 func executeHandler(w http.ResponseWriter, r *http.Request) {
@@ -30,11 +31,10 @@ func executeHandler(w http.ResponseWriter, r *http.Request) {
 		req.TimeoutMS = 5000
 	}
 
-	response := api.ExecutionResponse{
-		Stdout:   "hello world",
-		Stderr:   "",
-		ExitCode: 0,
-		Error:    "",
+	response, err := sandbox.RunCodeInSandbox(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
