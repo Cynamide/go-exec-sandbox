@@ -8,53 +8,46 @@ import (
 	"time"
 
 	"gexec-sandbox/internal/api"
+	"gexec-sandbox/internal/config"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 )
 
-func getLanguageImage(language string) string {
-	switch strings.ToLower(language) {
-	case "python", "py":
-		return "python:3.9-slim"
-	case "golang", "go":
-		return "golang:1.21-alpine"
-	default:
-		return "python:3.9-slim"
-	}
-}
-
-func getCommand(language string, filePath string) []string {
-	switch strings.ToLower(language) {
-	case "python", "py":
+func getCommand(language string, filePath string, cfg config.Config) []string {
+	lowerLang := strings.ToLower(language)
+	if strings.HasPrefix(lowerLang, "py") {
 		return []string{"python", filePath}
-	case "golang", "go":
+	}
+	if strings.HasPrefix(lowerLang, "go") {
 		return []string{"go", "run", filePath}
-	default:
-		return []string{"python", filePath}
 	}
+	return []string{language, filePath}
 }
 
-func getExtension(language string) string {
-	switch strings.ToLower(language) {
-	case "python", "py":
+func getExtension(language string, cfg config.Config) string {
+	lowerLang := strings.ToLower(language)
+	if strings.HasPrefix(lowerLang, "py") {
 		return ".py"
-	case "golang", "go":
+	}
+	if strings.HasPrefix(lowerLang, "go") {
 		return ".go"
-	default:
-		return ".py"
 	}
+	return ".txt"
 }
 
-func RunCodeInSandbox(req api.ExecutionRequest) (api.ExecutionResponse, error) {
+func RunCodeInSandbox(req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return api.ExecutionResponse{}, fmt.Errorf("failed to create docker client: %w", err)
 	}
 	defer cli.Close()
 
-	imageName := getLanguageImage(req.Language)
-	extension := getExtension(req.Language)
+	imageName, ok := cfg.Languages[req.Language]
+	if !ok {
+		return api.ExecutionResponse{Error: fmt.Sprintf("unsupported language: %s", req.Language)}, fmt.Errorf("unsupported language: %s", req.Language)
+	}
+	extension := getExtension(req.Language, cfg)
 	filePath := "/tmp/main" + extension
 
 	pull, err := cli.ImagePull(context.Background(), imageName, image.PullOptions{})
@@ -67,7 +60,7 @@ func RunCodeInSandbox(req api.ExecutionRequest) (api.ExecutionResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(req.TimeoutMS)*time.Millisecond)
 	defer cancel()
 
-	execCmd := getCommand(req.Language, filePath)
+	execCmd := getCommand(req.Language, filePath, cfg)
 	fullCmd := fmt.Sprintf("echo '%s' > %s && %s", strings.ReplaceAll(req.SourceCode, "'", "'\\''"), filePath, strings.Join(execCmd, " "))
 
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
@@ -79,7 +72,7 @@ func RunCodeInSandbox(req api.ExecutionRequest) (api.ExecutionResponse, error) {
 		NetworkDisabled: true,
 	}, &container.HostConfig{
 		Resources: container.Resources{
-			Memory:   128 * 1024 * 1024,
+			Memory:   int64(cfg.MaxMemoryMB) * 1024 * 1024,
 			CPUQuota: 50000,
 		},
 	}, nil, nil, "")
