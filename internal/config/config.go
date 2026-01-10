@@ -8,13 +8,13 @@ type Config struct {
 
 func LoadConfig() Config {
 	return Config{
-		DefaultTimeoutMS: 5000,
-		MaxMemoryMB:      128,
+		DefaultTimeoutMS: 60000,
+		MaxMemoryMB:      256,
 		Languages: map[string]string{
 			"python": "python:3.9-slim",
 			"py":     "python:3.9-slim",
-			"golang": "golang:1.21-alpine",
-			"go":     "golang:1.21-alpine",
+			"golang": "golang:1.24-alpine",
+			"go":     "golang:1.24-alpine",
 		},
 	}
 }
