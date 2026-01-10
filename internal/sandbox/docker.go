@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"gexec-sandbox/internal/api"
@@ -13,6 +15,38 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 )
+
+var (
+	containers      = make(map[string]*client.Client)
+	containersMutex sync.RWMutex
+)
+
+func registerContainer(containerID string, cli *client.Client) {
+	containersMutex.Lock()
+	defer containersMutex.Unlock()
+	containers[containerID] = cli
+}
+
+func unregisterContainer(containerID string) {
+	containersMutex.Lock()
+	defer containersMutex.Unlock()
+	delete(containers, containerID)
+}
+
+func CleanupAllContainers() {
+	containersMutex.RLock()
+	defer containersMutex.RUnlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	for containerID, cli := range containers {
+		log.Printf("Cleaning up container: %s", containerID)
+		cli.ContainerKill(ctx, containerID, "SIGKILL")
+		cli.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true})
+		cli.Close()
+	}
+}
 
 func getCommand(language string, filePath string, cfg config.Config) []string {
 	lowerLang := strings.ToLower(language)
@@ -81,9 +115,12 @@ func RunCodeInSandbox(req api.ExecutionRequest, cfg config.Config) (api.Executio
 	}
 
 	containerID := resp.ID
+	registerContainer(containerID, cli)
+
 	defer func() {
 		cli.ContainerKill(context.Background(), containerID, "SIGKILL")
 		cli.ContainerRemove(context.Background(), containerID, container.RemoveOptions{Force: true})
+		unregisterContainer(containerID)
 	}()
 
 	attachResp, err := cli.ContainerAttach(ctx, resp.ID, container.AttachOptions{

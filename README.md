@@ -10,6 +10,7 @@ A secure code execution service that runs user-submitted code in isolated Docker
 - ⏱️ **Timeout Control**: Enforce execution time limits per request
 - ✅ **Robust Validation**: Input validation for language support and source code
 - 📊 **Structured Response**: JSON responses with stdout, stderr, exit codes, and error details
+- 📈 **Metrics Tracking**: Built-in request and error tracking for observability
 
 ## Prerequisites
 

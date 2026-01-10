@@ -1,9 +1,15 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"gexec-sandbox/internal/api"
 	"gexec-sandbox/internal/config"
@@ -68,7 +74,9 @@ func executeHandler(cfg config.Config) http.HandlerFunc {
 func main() {
 	cfg := config.LoadConfig()
 
-	http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -77,7 +85,7 @@ func main() {
 		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	})
 
-	http.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -86,7 +94,33 @@ func main() {
 		json.NewEncoder(w).Encode(metrics.GetMetrics())
 	})
 
-	http.HandleFunc("/execute", executeHandler(cfg))
+	mux.HandleFunc("/execute", executeHandler(cfg))
 
-	http.ListenAndServe(":8080", nil)
+	server := &http.Server{
+		Addr:    ":8080",
+		Handler: mux,
+	}
+
+	go func() {
+		log.Println("Server starting on :8080")
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server failed: %v", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("Shutting down server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		log.Printf("Server forced to shutdown: %v", err)
+		sandbox.CleanupAllContainers()
+	}
+
+	log.Println("Server exited")
 }
