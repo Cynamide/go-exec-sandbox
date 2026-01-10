@@ -14,7 +14,9 @@ import (
 	"gexec-sandbox/internal/api"
 	"gexec-sandbox/internal/config"
 	"gexec-sandbox/internal/metrics"
+	"gexec-sandbox/internal/middleware"
 	"gexec-sandbox/internal/sandbox"
+	"golang.org/x/time/rate"
 )
 
 func executeHandler(cfg config.Config) http.HandlerFunc {
@@ -94,7 +96,7 @@ func main() {
 		json.NewEncoder(w).Encode(metrics.GetMetrics())
 	})
 
-	mux.HandleFunc("/execute", executeHandler(cfg))
+	mux.Handle("/execute", middleware.RateLimitMiddleware(rate.Every(6*time.Second), 10)(http.HandlerFunc(executeHandler(cfg))))
 
 	server := &http.Server{
 		Addr:    ":8080",
