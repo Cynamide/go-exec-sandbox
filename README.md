@@ -11,12 +11,21 @@ A secure code execution service that runs user-submitted code in isolated Docker
 - ✅ **Robust Validation**: Input validation for language support and source code
 - 📊 **Structured Response**: JSON responses with stdout, stderr, exit codes, and error details
 - 📈 **Metrics Tracking**: Built-in request and error tracking for observability
+- 🛑 **Graceful Shutdown**: Handles SIGINT/SIGTERM with proper cleanup of in-flight requests and containers
+- 🚦 **Rate Limiting**: In-memory IP-based rate limiting (10 requests/minute by default)
 
 ## Prerequisites
 
 - **Go 1.21+** - [Install Go](https://golang.org/dl/)
 - **Docker** - [Install Docker](https://docs.docker.com/get-docker/)
 - Docker daemon must be running
+
+### Dependencies
+
+Dependencies are automatically downloaded when you run `go mod download` or `go build`. Key dependencies include:
+
+- `github.com/docker/docker` - Docker SDK for Go
+- `golang.org/x/time/rate` - Rate limiting implementation
 
 ## Security
 
@@ -26,8 +35,10 @@ This service uses Docker containers to isolate user code execution:
 - **Resource Limits**: Memory and CPU quotas restrict resource usage (default: 128MB, 50k CPU quota)
 - **Ephemeral Containers**: Containers are automatically removed after execution
 - **Context Timeouts**: Execution is enforced with context timeouts to prevent hanging processes
+- **Graceful Shutdown**: Server catches SIGINT/SIGTERM signals and properly cleans up all active containers
+- **Rate Limiting**: In-memory IP-based rate limiting prevents abuse (10 requests/minute with 2 burst)
 
-> ⚠️ **Important**: While Docker provides strong isolation, this service should still be run behind additional security layers (rate limiting, authentication, etc.) in production environments.
+> ⚠️ **Important**: While Docker provides strong isolation, this service should still be run behind additional security layers (authentication, firewall, etc.) in production environments.
 
 ## Installation
 
@@ -100,6 +111,31 @@ docker run -p 8080:8080 -v /var/run/docker.sock:/var/run/docker.sock gexec-sandb
   "status": "ok"
 }
 ```
+
+### Metrics
+
+**Endpoint**: `GET /metrics`
+
+**Response**:
+```json
+{
+  "total_requests": 42,
+  "total_errors": 3
+}
+```
+
+### Rate Limiting
+
+The `/execute` endpoint is rate limited to **10 requests per minute per IP address** (configurable).
+
+**Response when rate limited** (HTTP 429):
+```json
+{
+  "error": "Too many requests"
+}
+```
+
+You can adjust the rate limit in `cmd/server/main.go` by modifying the `RateLimitMiddleware` parameters.
 
 ## Example Commands
 
@@ -182,6 +218,27 @@ Config{
 }
 ```
 
+**Rate Limiting Configuration**
+
+Edit `cmd/server/main.go` to adjust rate limiting:
+
+```go
+// Current: 10 requests per minute with burst of 2
+mux.Handle("/execute", middleware.RateLimitMiddleware(
+    rate.Every(6*time.Second),  // 1 request every 6 seconds = 10/min
+    2,                          // Burst allowance
+)(http.HandlerFunc(executeHandler(cfg))))
+```
+
+**Graceful Shutdown Configuration**
+
+Edit `cmd/server/main.go` to adjust shutdown timeout:
+
+```go
+// Current: 30 second graceful shutdown timeout
+ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+```
+
 ## Adding New Languages
 
 1. Add the Docker image to `Languages` map in `config.go`
@@ -194,14 +251,18 @@ Config{
 gexec-sandbox/
 ├── cmd/
 │   └── server/
-│       └── main.go          # HTTP server and handlers
+│       └── main.go          # HTTP server, graceful shutdown, and handlers
 ├── internal/
 │   ├── api/
 │   │   └── types.go         # Request/response types
 │   ├── config/
 │   │   └── config.go        # Configuration management
+│   ├── metrics/
+│   │   └── metrics.go       # Request and error metrics tracking
+│   ├── middleware/
+│   │   └── rate_limiter.go  # IP-based rate limiting middleware
 │   └── sandbox/
-│       └── docker.go        # Docker container execution logic
+│       └── docker.go        # Docker container execution logic with cleanup
 ├── go.mod                   # Go module definition
 ├── go.sum                   # Go dependencies checksums
 ├── Dockerfile               # Service container definition
@@ -230,6 +291,41 @@ go build -o server ./cmd/server
 
 # Build for Linux (for Docker)
 GOOS=linux GOARCH=amd64 go build -o server-linux ./cmd/server
+```
+
+### Graceful Shutdown Testing
+
+The server gracefully handles shutdown signals (SIGINT/SIGTERM):
+
+```bash
+# Start the server
+go run ./cmd/server
+
+# In another terminal, send a request
+curl -X POST http://localhost:8080/execute \
+  -H "Content-Type: application/json" \
+  -d '{"language": "python", "source_code":"import time; time.sleep(60)"}'
+
+# Press Ctrl+C in the server terminal
+# Server will wait up to 30 seconds for in-flight requests to complete
+# All active containers will be cleaned up automatically
+```
+
+### Rate Limiting Testing
+
+```bash
+# Send 10 rapid requests (should all succeed)
+for i in {1..10}; do
+  curl -X POST http://localhost:8080/execute \
+    -H "Content-Type: application/json" \
+    -d '{"language": "python", "source_code":"print('$i')"}'
+done
+
+# 11th request will be rate limited
+curl -X POST http://localhost:8080/execute \
+  -H "Content-Type: application/json" \
+  -d '{"language": "python", "source_code":"print(11)"}'
+# Returns: HTTP 429 Too Many Requests
 ```
 
 ## License
