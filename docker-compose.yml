@@ -6,10 +6,20 @@ services:
     container_name: ollama
     ports:
       - "11434:11434"
+    environment:
+      - OLLAMA_MODEL=${OLLAMA_MODEL}
     volumes:
       - ollama_data:/root/.ollama
     networks:
       - app-network
+    command: sh -c "set -e && echo \"Pulling model $$OLLAMA_MODEL...\" && ollama pull $$OLLAMA_MODEL && echo \"Model pulled successfully\" && ollama serve"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
   app:
     build:
@@ -20,6 +30,7 @@ services:
       - "8080:8080"
     environment:
       - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
