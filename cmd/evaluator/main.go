@@ -13,6 +13,7 @@ import (
 
 	"gexec-sandbox/internal/api"
 	"gexec-sandbox/internal/config"
+	"gexec-sandbox/internal/llm"
 	"gexec-sandbox/internal/metrics"
 	"gexec-sandbox/internal/middleware"
 	"gexec-sandbox/internal/sandbox"
@@ -75,6 +76,13 @@ func executeHandler(cfg config.Config) http.HandlerFunc {
 
 func main() {
 	cfg := config.LoadConfig()
+
+	log.Println("Checking Ollama availability...")
+	if err := llm.WaitForOllama(); err != nil {
+		log.Fatalf("Failed to connect to Ollama: %v", err)
+	}
+
+	log.Printf("Model %s should be available from Ollama service", cfg.OLLAMAModel)
 
 	mux := http.NewServeMux()
 

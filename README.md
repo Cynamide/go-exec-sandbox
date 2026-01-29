@@ -1,11 +1,11 @@
-# gexec-sandbox
-
-A secure code execution service that runs user-submitted code in isolated Docker containers. Perfect for online code editors, interview platforms, or educational tools.
+# LocalEval: Secure Code Execution Sandbox & LLM Evaluation Harness
+A secure code execution service and LLM evaluation harness that runs user-submitted or AI-generated code in isolated Docker containers. Perfect for online code editors, interview platforms, or educational tools.
 
 ## Features
 
 - 🐳 **Secure Execution**: Code runs in isolated Docker containers with network disabled
 - ⚡ **Multi-Language Support**: Python and Golang out of the box (easily extensible)
+- 🤖 **LLM Integration**: Built-in Ollama client for local LLM inference
 - 🛡️ **Resource Limits**: Configurable memory and CPU quotas prevent abuse
 - ⏱️ **Timeout Control**: Enforce execution time limits per request
 - ✅ **Robust Validation**: Input validation for language support and source code
@@ -13,11 +13,12 @@ A secure code execution service that runs user-submitted code in isolated Docker
 - 📈 **Metrics Tracking**: Built-in request and error tracking for observability
 - 🛑 **Graceful Shutdown**: Handles SIGINT/SIGTERM with proper cleanup of in-flight requests and containers
 - 🚦 **Rate Limiting**: In-memory IP-based rate limiting (10 requests/minute by default)
+- 🐋 **Docker Compose Ready**: Complete orchestration with Ollama service
 
 ## Prerequisites
 
 - **Go 1.21+** - [Install Go](https://golang.org/dl/)
-- **Docker** - [Install Docker](https://docs.docker.com/get-docker/)
+- **Docker & Docker Compose** - [Install Docker](https://docs.docker.com/get-docker/)
 - Docker daemon must be running
 
 ### Dependencies
@@ -26,6 +27,7 @@ Dependencies are automatically downloaded when you run `go mod download` or `go 
 
 - `github.com/docker/docker` - Docker SDK for Go
 - `golang.org/x/time/rate` - Rate limiting implementation
+- `github.com/ollama/ollama/api` - Ollama API client for local LLM inference
 
 ## Security
 
@@ -49,31 +51,73 @@ cd gexec-sandbox
 
 # Install dependencies
 go mod download
+
+# Copy environment file and configure
+cp .env.example .env
+# Edit .env to set your preferred Ollama model
 ```
 
-## Running the Server
+## Environment Configuration
+
+Create a `.env` file in the project root:
+
+```bash
+# Required: Ollama model to use (set in .env before running)
+OLLAMA_MODEL=qwen3:4b
+
+# Optional: Ollama host URL (default: http://localhost:11434)
+OLLAMA_HOST=http://localhost:11434
+```
+
+## Running the Evaluator
+
+### Using Docker Compose (Recommended)
+
+```bash
+# Start all services (Ollama + Evaluator)
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+This will:
+1. Pull and start Ollama service with your configured model
+2. Build and start the evaluator service
+3. Connect the evaluator to Ollama automatically
 
 ### Local Development
 
 ```bash
-# Start the server
-go run ./cmd/server
+# Start Ollama locally first (if not using Docker)
+docker run -d -p 11434:11434 ollama/ollama
+docker exec -it <container_id> ollama pull qwen3:4b
+
+# Start the evaluator
+go run ./cmd/evaluator
 
 # Or build and run
-go build -o server ./cmd/server
-./server
+go build -o evaluator ./cmd/evaluator
+./evaluator
 ```
 
-The server will start on `http://localhost:8080`
+The evaluator will start on `http://localhost:8080`
 
-### Using Docker
+### Using Docker (Standalone)
 
 ```bash
 # Build the Docker image
 docker build -t gexec-sandbox .
 
 # Run the container (requires mounting Docker socket)
-docker run -p 8080:8080 -v /var/run/docker.sock:/var/run/docker.sock gexec-sandbox
+docker run -p 8080:8080 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -e OLLAMA_HOST=http://host.docker.internal:11434 \
+  -e OLLAMA_MODEL=qwen3:4b \
+  gexec-sandbox
 ```
 
 ## API Usage
@@ -203,24 +247,35 @@ curl -X POST http://localhost:8080/execute \
 
 ## Configuration
 
+### Environment Variables
+
+The evaluator reads configuration from environment variables:
+
+- `OLLAMA_HOST`: Ollama server URL (default: `http://localhost:11434`)
+- `OLLAMA_MODEL`: Model name to use (required, e.g., `qwen3:4b`, `codellama:latest`)
+
+### Code Configuration
+
 Edit `internal/config/config.go` to customize:
 
 ```go
 Config{
     DefaultTimeoutMS: 60000,  // Default timeout in milliseconds
     MaxMemoryMB:      256,   // Maximum memory per container (MB)
+    OLLAMAHost:       "http://localhost:11434",
+    OLLAMAModel:      "qwen3:4b",
     Languages: map[string]string{
         "python": "python:3.9-slim",
         "py":     "python:3.9-slim",
-        "golang": "golang:1.21-alpine",
-        "go":     "golang:1.21-alpine",
+        "golang": "golang:1.24-alpine",
+        "go":     "golang:1.24-alpine",
     },
 }
 ```
 
 **Rate Limiting Configuration**
 
-Edit `cmd/server/main.go` to adjust rate limiting:
+Edit `cmd/evaluator/main.go` to adjust rate limiting:
 
 ```go
 // Current: 10 requests per minute with burst of 2
@@ -232,7 +287,7 @@ mux.Handle("/execute", middleware.RateLimitMiddleware(
 
 **Graceful Shutdown Configuration**
 
-Edit `cmd/server/main.go` to adjust shutdown timeout:
+Edit `cmd/evaluator/main.go` to adjust shutdown timeout:
 
 ```go
 // Current: 30 second graceful shutdown timeout
@@ -250,22 +305,26 @@ ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 ```
 gexec-sandbox/
 ├── cmd/
-│   └── server/
-│       └── main.go          # HTTP server, graceful shutdown, and handlers
+│   └── evaluator/
+│       └── main.go          # HTTP server, LLM integration, graceful shutdown, and handlers
 ├── internal/
 │   ├── api/
 │   │   └── types.go         # Request/response types
 │   ├── config/
-│   │   └── config.go        # Configuration management
+│   │   └── config.go        # Configuration management with env var support
+│   ├── llm/
+│   │   └── llm.go           # Ollama client for LLM inference and model management
 │   ├── metrics/
 │   │   └── metrics.go       # Request and error metrics tracking
 │   ├── middleware/
 │   │   └── rate_limiter.go  # IP-based rate limiting middleware
 │   └── sandbox/
 │       └── docker.go        # Docker container execution logic with cleanup
+├── .env.example             # Environment variable template
+├── docker-compose.yml       # Multi-service orchestration (Ollama + Evaluator)
+├── Dockerfile               # Evaluator container definition
 ├── go.mod                   # Go module definition
 ├── go.sum                   # Go dependencies checksums
-├── Dockerfile               # Service container definition
 └── README.md                # This file
 ```
 
@@ -281,33 +340,36 @@ curl http://localhost:8080/ping
 curl -X POST http://localhost:8080/execute \
   -H "Content-Type: application/json" \
   -d '{"language": "python", "source_code": "print(2+2)"}'
+
+# Test metrics
+curl http://localhost:8080/metrics
 ```
 
 ### Building
 
 ```bash
 # Build for current platform
-go build -o server ./cmd/server
+go build -o evaluator ./cmd/evaluator
 
 # Build for Linux (for Docker)
-GOOS=linux GOARCH=amd64 go build -o server-linux ./cmd/server
+GOOS=linux GOARCH=amd64 go build -o evaluator-linux ./cmd/evaluator
 ```
 
 ### Graceful Shutdown Testing
 
-The server gracefully handles shutdown signals (SIGINT/SIGTERM):
+The evaluator gracefully handles shutdown signals (SIGINT/SIGTERM):
 
 ```bash
-# Start the server
-go run ./cmd/server
+# Start the evaluator
+go run ./cmd/evaluator
 
 # In another terminal, send a request
 curl -X POST http://localhost:8080/execute \
   -H "Content-Type: application/json" \
   -d '{"language": "python", "source_code":"import time; time.sleep(60)"}'
 
-# Press Ctrl+C in the server terminal
-# Server will wait up to 30 seconds for in-flight requests to complete
+# Press Ctrl+C in the evaluator terminal
+# Evaluator will wait up to 30 seconds for in-flight requests to complete
 # All active containers will be cleaned up automatically
 ```
 
@@ -327,6 +389,71 @@ curl -X POST http://localhost:8080/execute \
   -d '{"language": "python", "source_code":"print(11)"}'
 # Returns: HTTP 429 Too Many Requests
 ```
+
+## Project Roadmap
+
+This project is being developed as a complete LLM benchmarking engine. Here's the current status based on the project goals:
+
+### ✅ Completed Features
+
+- **Local LLM Evaluation Harness**
+  - ✅ Architected Go-based evaluation system orchestrating local inference (Ollama)
+  - ✅ Docker Compose orchestration for Ollama and evaluator services
+  - ✅ Environment-based configuration for model selection and host settings
+  - ✅ Connection handling and availability checking for Ollama service
+
+- **Secure Multi-Language Execution Sandbox**
+  - ✅ Engineered secure sandbox isolating untrusted code in Docker containers
+  - ✅ Network restrictions on containers (network disabled by default)
+  - ✅ Memory and CPU resource limits to prevent abuse
+  - ✅ Support for Python and Golang with easy extensibility
+  - ✅ Safe execution of AI-generated code output
+
+- **Docker Orchestration**
+  - ✅ Docker Compose setup with Ollama service
+  - ✅ Automatic model pulling on Ollama startup
+  - ✅ Service networking and volume management
+  - ✅ Environment variable configuration for flexibility
+
+- **Core Infrastructure**
+  - ✅ stdin/stdout piping for precise test case evaluation
+  - ✅ Timeout enforcement and graceful container cleanup
+  - ✅ Rate limiting and request metrics
+  - ✅ Structured JSON API responses
+  - ✅ Graceful shutdown with container cleanup
+
+### 🚧 In Progress / Planned Features
+
+- **Benchmarking Pipeline**
+  - 🚧 Automated benchmarking pipeline infrastructure
+  - 🚧 Integration of LLM code generation with execution
+  - 🚧 Dataset management system for problems and test cases
+
+- **Evaluation Metrics**
+  - 🚧 Pass@k metric calculation (k=1, k=5, k=10)
+  - 🚧 Statistical analysis and reporting
+  - 🚧 Performance benchmarking across multiple models
+
+- **LeetCode-Style Challenges**
+  - 🚧 Dataset of programming problems with test cases
+  - 🚧 Problem parser and test case runner
+  - 🚧 Validation against reference solutions
+  - 🚧 Support for multiple problem categories and difficulty levels
+
+- **Enhanced Features**
+  - 🚧 Batch evaluation mode for comparing multiple models
+  - 🚧 Result caching and persistence
+  - 🚧 Progress tracking and status reporting
+  - 🚧 Web UI or CLI interface for running benchmarks
+
+### 🎯 Future Enhancements
+
+- Multi-model comparison support
+- Distributed evaluation setup
+- Custom test case format support
+- Performance profiling and optimization
+- Result visualization and dashboards
+- Integration with additional LLM backends
 
 ## License
 
