@@ -12,7 +12,7 @@ services:
       - ollama_data:/root/.ollama
     networks:
       - app-network
-    command: sh -c "set -e && echo \"Pulling model $$OLLAMA_MODEL...\" && ollama pull $$OLLAMA_MODEL && echo \"Model pulled successfully\" && ollama serve"
+    entrypoint: ["sh", "-c", "ollama serve & sleep 5 && echo \"Pulling model $$OLLAMA_MODEL...\" && ollama pull $$OLLAMA_MODEL && echo \"Model pulled successfully\" && wait"]
     deploy:
       resources:
         reservations:
