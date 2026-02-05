@@ -1,0 +1,62 @@
+[
+  {
+    "id": "two-sum",
+    "title": "Two Sum",
+    "description": "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.",
+    "language": "python",
+    "test_cases": [
+      {
+        "input": "2 7 11 15\n9",
+        "expected_output": "0 1"
+      },
+      {
+        "input": "3 2 4\n6",
+        "expected_output": "1 2"
+      },
+      {
+        "input": "3 3\n6",
+        "expected_output": "0 1"
+      }
+    ]
+  },
+  {
+    "id": "palindrome",
+    "title": "Palindrome Check",
+    "description": "Given a string, return 'true' if it is a palindrome, otherwise return 'false'.",
+    "language": "python",
+    "test_cases": [
+      {
+        "input": "racecar",
+        "expected_output": "true"
+      },
+      {
+        "input": "hello",
+        "expected_output": "false"
+      },
+      {
+        "input": "a",
+        "expected_output": "true"
+      }
+    ]
+  },
+  {
+    "id": "reverse-string",
+    "title": "Reverse String",
+    "description": "Given a string, return the reversed version of it.",
+    "language": "python",
+    "test_cases": [
+      {
+        "input": "hello",
+        "expected_output": "olleh"
+      },
+      {
+        "input": "world",
+        "expected_output": "dlrow"
+      },
+      {
+        "input": "a",
+        "expected_output": "a"
+      }
+    ]
+  }
+]
