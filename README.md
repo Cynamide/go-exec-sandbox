@@ -17,7 +17,7 @@ A secure code execution service and LLM evaluation harness that runs user-submit
 
 ## Prerequisites
 
-- **Go 1.21+** - [Install Go](https://golang.org/dl/)
+- **Go 1.24+** - [Install Go](https://golang.org/dl/)
 - **Docker & Docker Compose** - [Install Docker](https://docs.docker.com/get-docker/)
 - Docker daemon must be running
 
@@ -307,9 +307,14 @@ gexec-sandbox/
 ├── cmd/
 │   └── evaluator/
 │       └── main.go          # HTTP server, LLM integration, graceful shutdown, and handlers
+├── data/
+│   └── problems.json        # Benchmark problem dataset
 ├── internal/
 │   ├── api/
 │   │   └── types.go         # Request/response types
+│   ├── benchmark/
+│   │   ├── harness.go       # Benchmark harness for running evaluations
+│   │   └── types.go         # Benchmark-specific type definitions
 │   ├── config/
 │   │   └── config.go        # Configuration management with env var support
 │   ├── llm/
@@ -321,6 +326,7 @@ gexec-sandbox/
 │   └── sandbox/
 │       └── docker.go        # Docker container execution logic with cleanup
 ├── .env.example             # Environment variable template
+├── .gitignore               # Git ignore patterns
 ├── docker-compose.yml       # Multi-service orchestration (Ollama + Evaluator)
 ├── Dockerfile               # Evaluator container definition
 ├── go.mod                   # Go module definition
@@ -425,7 +431,8 @@ This project is being developed as a complete LLM benchmarking engine. Here's th
 ### 🚧 In Progress / Planned Features
 
 - **Benchmarking Pipeline**
-  - 🚧 Automated benchmarking pipeline infrastructure
+  - ✅ Benchmark harness infrastructure (internal/benchmark/)
+  - ✅ Problem dataset structure (data/problems.json)
   - 🚧 Integration of LLM code generation with execution
   - 🚧 Dataset management system for problems and test cases
 
