@@ -45,7 +45,9 @@ func (c *Client) chatRequest(problem string, language string) *api.ChatRequest {
 }
 
 func (c *Client) GenerateCode(problem string, language string) (string, error) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
 	req := c.chatRequest(problem, language)
 
 	var response string

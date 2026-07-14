@@ -61,3 +61,25 @@ func TestRunEvaluationPassesTestCaseInputToSandbox(t *testing.T) {
 		t.Fatalf("RunEvaluation() passed %d problems, want 1", report.PassedProblems)
 	}
 }
+
+func TestRunEvaluationReturnsZeroRatesForEmptyProblems(t *testing.T) {
+	t.Setenv("OLLAMA_MODEL", "test-model")
+
+	report := RunEvaluation(nil, 1, stubLLMClient{})
+
+	if report.TotalProblems != 0 {
+		t.Fatalf("TotalProblems = %d, want 0", report.TotalProblems)
+	}
+
+	if report.PassedProblems != 0 {
+		t.Fatalf("PassedProblems = %d, want 0", report.PassedProblems)
+	}
+
+	if report.Pass1Rate != 0 {
+		t.Fatalf("Pass1Rate = %v, want 0", report.Pass1Rate)
+	}
+
+	if report.PassKRate != 0 {
+		t.Fatalf("PassKRate = %v, want 0", report.PassKRate)
+	}
+}

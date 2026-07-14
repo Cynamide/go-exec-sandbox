@@ -25,6 +25,10 @@ type Report struct {
 func RunEvaluation(problems []Problem, k int, client LLMClient) Report {
 	cfg := config.LoadConfig()
 	total := len(problems)
+	if total == 0 {
+		return Report{}
+	}
+
 	passed := 0
 	pass1 := 0
 
