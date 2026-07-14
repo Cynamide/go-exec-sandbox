@@ -13,6 +13,8 @@ type LLMClient interface {
 	GenerateCode(problem string, language string) (string, error)
 }
 
+var runCodeInSandbox = sandbox.RunCodeInSandbox
+
 type Report struct {
 	TotalProblems  int     `json:"total_problems"`
 	PassedProblems int     `json:"passed_problems"`
@@ -43,10 +45,11 @@ func RunEvaluation(problems []Problem, k int, client LLMClient) Report {
 				req := api.ExecutionRequest{
 					Language:   problem.Language,
 					SourceCode: code,
+					Stdin:      tc.Input,
 					TimeoutMS:  cfg.DefaultTimeoutMS,
 				}
 
-				resp, err := sandbox.RunCodeInSandbox(req, cfg)
+				resp, err := runCodeInSandbox(req, cfg)
 				if err != nil {
 					allPassed = false
 					break
@@ -87,16 +90,10 @@ func RunEvaluation(problems []Problem, k int, client LLMClient) Report {
 }
 
 func extractCode(text string) string {
-	codeBlockRegex := regexp.MustCompile("```(?:python|go|golang)?\n?(.*?)```")
+	codeBlockRegex := regexp.MustCompile("(?s)```(?:[a-zA-Z0-9_+-]+)?\\n?(.*?)```")
 	matches := codeBlockRegex.FindStringSubmatch(text)
 	if len(matches) > 1 {
 		return strings.TrimSpace(matches[1])
-	}
-
-	multiCodeBlockRegex := regexp.MustCompile("```\n(.*?)```")
-	matches2 := multiCodeBlockRegex.FindStringSubmatch(text)
-	if len(matches2) > 1 {
-		return strings.TrimSpace(matches2[1])
 	}
 
 	return strings.TrimSpace(text)

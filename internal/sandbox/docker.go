@@ -70,6 +70,10 @@ func getExtension(language string, cfg config.Config) string {
 	return ".txt"
 }
 
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
+}
+
 func RunCodeInSandbox(req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -95,7 +99,12 @@ func RunCodeInSandbox(req api.ExecutionRequest, cfg config.Config) (api.Executio
 	defer cancel()
 
 	execCmd := getCommand(req.Language, filePath, cfg)
-	fullCmd := fmt.Sprintf("echo '%s' > %s && %s", strings.ReplaceAll(req.SourceCode, "'", "'\\''"), filePath, strings.Join(execCmd, " "))
+	sourceCmd := fmt.Sprintf("printf %%s %s > %s", shellQuote(req.SourceCode), shellQuote(filePath))
+	runCmd := strings.Join(execCmd, " ")
+	if req.Stdin != "" {
+		runCmd = fmt.Sprintf("printf %%s %s | %s", shellQuote(req.Stdin), runCmd)
+	}
+	fullCmd := fmt.Sprintf("%s && %s", sourceCmd, runCmd)
 
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
 		Image:           imageName,

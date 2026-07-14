@@ -3,6 +3,7 @@ package api
 type ExecutionRequest struct {
 	Language   string `json:"language"`
 	SourceCode string `json:"source_code"`
+	Stdin      string `json:"stdin"`
 	TimeoutMS  int    `json:"timeout_ms"`
 }
 
