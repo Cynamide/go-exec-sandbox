@@ -37,11 +37,6 @@ func (i *IPRateLimiter) getLimiter(ip string) *rate.Limiter {
 }
 
 func (i *IPRateLimiter) getIP(r *http.Request) string {
-	forwarded := r.Header.Get("X-Forwarded-For")
-	if forwarded != "" {
-		return forwarded
-	}
-
 	ip, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return r.RemoteAddr
