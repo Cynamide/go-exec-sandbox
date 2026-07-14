@@ -14,12 +14,9 @@ const (
 	systemPrompt = "You are an expert programmer. Provide only the function/class implementation. Do not include usage examples."
 )
 
-var (
-	cfg = config.LoadConfig()
-)
-
 type Client struct {
 	client *api.Client
+	cfg    config.Config
 }
 
 func NewClient() (*Client, error) {
@@ -27,28 +24,29 @@ func NewClient() (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Ollama client: %w", err)
 	}
-	return &Client{client: client}, nil
+	return &Client{client: client, cfg: config.LoadConfig()}, nil
+}
+
+func (c *Client) chatRequest(problem string, language string) *api.ChatRequest {
+	return &api.ChatRequest{
+		Model: c.cfg.OLLAMAModel,
+		Messages: []api.Message{
+			{
+				Role:    "system",
+				Content: systemPrompt,
+			},
+			{
+				Role:    "user",
+				Content: fmt.Sprintf("Write a %s solution for:\n%s", language, problem),
+			},
+		},
+		Stream: new(bool),
+	}
 }
 
 func (c *Client) GenerateCode(problem string, language string) (string, error) {
 	ctx := context.Background()
-
-	messages := []api.Message{
-		{
-			Role:    "system",
-			Content: systemPrompt,
-		},
-		{
-			Role:    "user",
-			Content: fmt.Sprintf("Write a %s solution for:\n%s", language, problem),
-		},
-	}
-
-	req := &api.ChatRequest{
-		Model:    cfg.OLLAMAModel,
-		Messages: messages,
-		Stream:   new(bool),
-	}
+	req := c.chatRequest(problem, language)
 
 	var response string
 	err := c.client.Chat(ctx, req, func(resp api.ChatResponse) error {
@@ -91,6 +89,8 @@ func WaitForOllama() error {
 }
 
 func PullModel() error {
+	cfg := config.LoadConfig()
+
 	client, err := api.ClientFromEnvironment()
 	if err != nil {
 		return fmt.Errorf("failed to create Ollama client: %w", err)
@@ -120,6 +120,8 @@ func PullModel() error {
 }
 
 func CheckModelExists() (bool, error) {
+	cfg := config.LoadConfig()
+
 	client, err := api.ClientFromEnvironment()
 	if err != nil {
 		return false, fmt.Errorf("failed to create Ollama client: %w", err)
