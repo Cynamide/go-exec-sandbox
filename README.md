@@ -8,7 +8,7 @@ A secure code execution service and benchmark harness for economically meaningfu
 - 🤖 **LLM Integration**: Built-in Ollama client for local LLM inference
 - 🛡️ **Resource Limits**: Configurable memory and CPU quotas prevent abuse
 - ⏱️ **Timeout Control**: Enforce execution time limits per request
-- ✅ **Robust Validation**: Input validation for language support and source code
+- ✅ **Robust Validation**: Input validation for language support and submitted source
 - 📊 **Structured Response**: JSON responses with stdout, stderr, exit codes, and error details
 - 📈 **Metrics Tracking**: Built-in request and error tracking for observability
 - 🛑 **Graceful Shutdown**: Handles SIGINT/SIGTERM with proper cleanup of in-flight requests and containers
@@ -107,7 +107,7 @@ go build -o evaluator ./cmd/evaluator
 ./evaluator
 ```
 
-The evaluator will start on `http://localhost:8080`. The `benchmark` mode uses the same shared benchmark service and prints the report as JSON instead of starting the HTTP server.
+The evaluator will start on `http://localhost:8080`. The `benchmark` mode prints the report as JSON to stdout and exits after the benchmark run completes.
 
 ### Using Docker (Standalone)
 
@@ -313,7 +313,6 @@ gexec-sandbox/
 ├── data/
 │   ├── tasks.json           # Benchmark task catalog
 │   ├── scaffolds.json       # Benchmark scaffold catalog
-│   └── problems.json        # Legacy toy benchmark dataset
 ├── internal/
 │   ├── api/
 │   │   └── types.go         # Request/response types
@@ -427,7 +426,7 @@ This project is being developed as a benchmark harness for economically meaningf
   - ✅ Environment variable configuration for flexibility
 
 - **Core Infrastructure**
-  - ✅ stdin/stdout piping for precise test case evaluation
+  - ✅ stdin/stdout piping for deterministic workflow verification
   - ✅ Timeout enforcement and graceful container cleanup
   - ✅ Rate limiting and request metrics
   - ✅ Structured JSON API responses
@@ -439,7 +438,7 @@ This project is being developed as a benchmark harness for economically meaningf
   - ✅ Benchmark harness infrastructure (internal/benchmark/)
   - ✅ Task and scaffold catalog structure (data/tasks.json, data/scaffolds.json)
   - ✅ Integration of LLM code generation with execution
-  - ✅ Dataset management system for tasks and test cases
+  - ✅ Catalog management system for tasks and verification data
 
 - **Evaluation Metrics**
   - ✅ Pass@k metric calculation (k=1, k=5, k=10)
@@ -447,7 +446,7 @@ This project is being developed as a benchmark harness for economically meaningf
   - 🚧 Performance benchmarking across multiple models
 
 - **Benchmark Scope**
-  - ✅ Code execution and validation against expected outputs
+  - ✅ Code execution and validation against task-specific outputs
   - ✅ Support for stdin-driven workflows
   - ✅ Support for software-engineering-style issue resolution
   - 🚧 Expansion to other economically valuable workflows such as office, spreadsheet, web, and computer-use tasks
@@ -462,7 +461,7 @@ This project is being developed as a benchmark harness for economically meaningf
 
 - Multi-model comparison support
 - Distributed evaluation setup
-- Custom test case format support
+- Custom workflow verification format support
 - Performance profiling and optimization
 - Result visualization and dashboards
 - Integration with additional LLM backends
