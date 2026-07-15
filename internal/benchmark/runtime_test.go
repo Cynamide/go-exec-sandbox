@@ -29,6 +29,7 @@ func TestRunTaskAppliesScaffoldPromptPrefix(t *testing.T) {
 		RunModeScaffolded,
 		client,
 		exec,
+		&fakeGrader{outcome: Outcome{Passed: true, Score: 1}},
 		config.Config{DefaultTimeoutMS: 1234},
 	)
 
@@ -42,6 +43,61 @@ func TestRunTaskAppliesScaffoldPromptPrefix(t *testing.T) {
 
 	if client.seenPrompt != "tool-assisted: solve this" {
 		t.Fatalf("seenPrompt = %q, want %q", client.seenPrompt, "tool-assisted: solve this")
+	}
+}
+
+func TestRunTaskUsesInjectedGrader(t *testing.T) {
+	exec := fakeExecutor{
+		resp: api.ExecutionResponse{Stdout: "executor output"},
+	}
+
+	client := &fakeLLMClient{
+		code: "```python\nprint('executor output')\n```",
+	}
+
+	task := Task{
+		ID:          "task-2",
+		Description: "solve this too",
+		Language:    "python",
+		TestCases:   []TestCase{{Input: "sample input", ExpectedOutput: "expected by grader"}},
+	}
+
+	grader := &fakeGrader{
+		outcome: Outcome{Passed: false, Score: 0.25},
+	}
+
+	run := RunTask(
+		task,
+		Scaffold{Name: "tool-assisted", PromptPrefix: "tool-assisted: "},
+		RunModeBaseline,
+		client,
+		exec,
+		grader,
+		config.Config{DefaultTimeoutMS: 1234},
+	)
+
+	if run.Passed {
+		t.Fatalf("Passed = %v, want false from injected grader", run.Passed)
+	}
+
+	if len(run.Outcomes) != 1 {
+		t.Fatalf("len(Outcomes) = %d, want 1", len(run.Outcomes))
+	}
+
+	if run.Outcomes[0] != grader.outcome {
+		t.Fatalf("Outcome = %#v, want %#v", run.Outcomes[0], grader.outcome)
+	}
+
+	if grader.seenTask.ID != task.ID {
+		t.Fatalf("grader task ID = %q, want %q", grader.seenTask.ID, task.ID)
+	}
+
+	if grader.seenResp.Stdout != exec.resp.Stdout {
+		t.Fatalf("grader stdout = %q, want %q", grader.seenResp.Stdout, exec.resp.Stdout)
+	}
+
+	if grader.seenTestCase != task.TestCases[0] {
+		t.Fatalf("grader test case = %#v, want %#v", grader.seenTestCase, task.TestCases[0])
 	}
 }
 
@@ -61,4 +117,18 @@ type fakeLLMClient struct {
 func (f *fakeLLMClient) GenerateCode(problem string, language string) (string, error) {
 	f.seenPrompt = problem
 	return f.code, nil
+}
+
+type fakeGrader struct {
+	outcome      Outcome
+	seenTask     Task
+	seenResp     api.ExecutionResponse
+	seenTestCase TestCase
+}
+
+func (f *fakeGrader) Grade(task Task, resp api.ExecutionResponse, tc TestCase) Outcome {
+	f.seenTask = task
+	f.seenResp = resp
+	f.seenTestCase = tc
+	return f.outcome
 }

@@ -31,7 +31,7 @@ func (stdoutGrader) Grade(task Task, resp api.ExecutionResponse, tc TestCase) Ou
 	}
 }
 
-func RunTask(task Task, scaffold Scaffold, mode RunMode, client LLMClient, exec Executor, cfg config.Config) Run {
+func RunTask(task Task, scaffold Scaffold, mode RunMode, client LLMClient, exec Executor, grader Grader, cfg config.Config) Run {
 	prompt := task.Description
 	if mode == RunModeScaffolded {
 		prompt = scaffold.ApplyPrompt(prompt)
@@ -53,7 +53,6 @@ func RunTask(task Task, scaffold Scaffold, mode RunMode, client LLMClient, exec 
 		TimeoutMS:  cfg.DefaultTimeoutMS,
 	}
 
-	grader := stdoutGrader{}
 	outcomes := make([]Outcome, 0, len(task.TestCases))
 	run := Run{
 		TaskID:   task.ID,
