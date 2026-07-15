@@ -24,12 +24,13 @@ const (
 )
 
 type Run struct {
-	TaskID   string   `json:"task_id"`
-	Mode     RunMode  `json:"mode"`
-	Scaffold Scaffold `json:"scaffold"`
-	Passed   bool     `json:"passed"`
-	Output   string   `json:"output,omitempty"`
-	Error    string   `json:"error,omitempty"`
+	TaskID   string    `json:"task_id"`
+	Mode     RunMode   `json:"mode"`
+	Scaffold Scaffold  `json:"scaffold"`
+	Passed   bool      `json:"passed"`
+	Outcomes []Outcome `json:"outcomes,omitempty"`
+	Output   string    `json:"output,omitempty"`
+	Error    string    `json:"error,omitempty"`
 }
 
 type Outcome struct {
