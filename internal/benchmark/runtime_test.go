@@ -29,7 +29,6 @@ func TestRunTaskAppliesScaffoldPromptPrefix(t *testing.T) {
 		RunModeScaffolded,
 		client,
 		exec,
-		&fakeGrader{outcome: Outcome{Passed: true, Score: 1}},
 		config.Config{DefaultTimeoutMS: 1234},
 	)
 
@@ -46,7 +45,7 @@ func TestRunTaskAppliesScaffoldPromptPrefix(t *testing.T) {
 	}
 }
 
-func TestRunTaskUsesInjectedGrader(t *testing.T) {
+func TestRunTaskWithGraderUsesInjectedGrader(t *testing.T) {
 	exec := fakeExecutor{
 		resp: api.ExecutionResponse{Stdout: "executor output"},
 	}
@@ -66,7 +65,7 @@ func TestRunTaskUsesInjectedGrader(t *testing.T) {
 		outcome: Outcome{Passed: false, Score: 0.25},
 	}
 
-	run := RunTask(
+	run := runTaskWithGrader(
 		task,
 		Scaffold{Name: "tool-assisted", PromptPrefix: "tool-assisted: "},
 		RunModeBaseline,
