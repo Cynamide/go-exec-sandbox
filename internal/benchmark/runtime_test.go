@@ -100,6 +100,25 @@ func TestRunTaskWithGraderUsesInjectedGrader(t *testing.T) {
 	}
 }
 
+func TestCodeExecutionAdapterDelegatesToSandbox(t *testing.T) {
+	adapter := CodeExecutionAdapter{
+		Runner: func(req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {
+			if req.Language != "python" {
+				t.Fatalf("Language = %q, want python", req.Language)
+			}
+			return api.ExecutionResponse{Stdout: "ok"}, nil
+		},
+	}
+
+	resp, err := adapter.Execute(api.ExecutionRequest{Language: "python", SourceCode: "print('ok')"}, config.Config{})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if resp.Stdout != "ok" {
+		t.Fatalf("Stdout = %q, want ok", resp.Stdout)
+	}
+}
+
 type fakeExecutor struct {
 	resp api.ExecutionResponse
 }
