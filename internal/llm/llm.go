@@ -44,8 +44,8 @@ func (c *Client) chatRequest(problem string, language string) *api.ChatRequest {
 	}
 }
 
-func (c *Client) GenerateCode(problem string, language string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+func (c *Client) GenerateCode(ctx context.Context, problem string, language string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
 	req := c.chatRequest(problem, language)
@@ -63,13 +63,13 @@ func (c *Client) GenerateCode(problem string, language string) (string, error) {
 	return response, nil
 }
 
-func WaitForOllama() error {
+func WaitForOllama(ctx context.Context) error {
 	client, err := api.ClientFromEnvironment()
 	if err != nil {
 		return fmt.Errorf("failed to create Ollama client: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
 	ticker := time.NewTicker(2 * time.Second)

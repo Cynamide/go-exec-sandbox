@@ -1,6 +1,7 @@
 package benchmark
 
 import (
+	"context"
 	"regexp"
 	"strings"
 
@@ -9,7 +10,7 @@ import (
 )
 
 type LLMClient interface {
-	GenerateCode(problem string, language string) (string, error)
+	GenerateCode(ctx context.Context, problem string, language string) (string, error)
 }
 
 var defaultCodeExecutionAdapter = NewCodeExecutionAdapter()
@@ -22,7 +23,7 @@ type Report struct {
 	PassKRate      float64 `json:"pass_k_rate"`
 }
 
-func RunEvaluation(problems []Problem, k int, client LLMClient) Report {
+func RunEvaluation(ctx context.Context, problems []Problem, k int, client LLMClient) Report {
 	cfg := config.LoadConfig()
 	total := len(problems)
 	if total == 0 {
@@ -37,7 +38,7 @@ func RunEvaluation(problems []Problem, k int, client LLMClient) Report {
 		pass1Attempt := false
 
 		for attempt := 1; attempt <= k; attempt++ {
-			code, err := client.GenerateCode(problem.Description, problem.Language)
+			code, err := client.GenerateCode(ctx, problem.Description, problem.Language)
 			if err != nil {
 				continue
 			}
@@ -53,7 +54,7 @@ func RunEvaluation(problems []Problem, k int, client LLMClient) Report {
 					TimeoutMS:  cfg.DefaultTimeoutMS,
 				}
 
-				resp, err := runCodeInSandbox(req, cfg)
+				resp, err := runCodeInSandbox(ctx, req, cfg)
 				if err != nil {
 					allPassed = false
 					break

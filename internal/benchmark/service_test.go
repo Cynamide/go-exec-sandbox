@@ -318,7 +318,7 @@ type benchmarkServiceLLMClient struct {
 	codeByPrompt map[string]string
 }
 
-func (f benchmarkServiceLLMClient) GenerateCode(problem string, language string) (string, error) {
+func (f benchmarkServiceLLMClient) GenerateCode(ctx context.Context, problem string, language string) (string, error) {
 	return f.codeByPrompt[problem], nil
 }
 
@@ -326,7 +326,7 @@ type benchmarkServiceExecutor struct {
 	responseBySource map[string]api.ExecutionResponse
 }
 
-func (f benchmarkServiceExecutor) Execute(req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {
+func (f benchmarkServiceExecutor) Execute(ctx context.Context, req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {
 	return f.responseBySource[req.SourceCode], nil
 }
 
@@ -337,7 +337,7 @@ type countingBenchmarkServiceLLMClient struct {
 	cancel           context.CancelFunc
 }
 
-func (f *countingBenchmarkServiceLLMClient) GenerateCode(problem string, language string) (string, error) {
+func (f *countingBenchmarkServiceLLMClient) GenerateCode(ctx context.Context, problem string, language string) (string, error) {
 	f.calls++
 	if f.cancel != nil && f.cancelAfterCalls > 0 && f.calls == f.cancelAfterCalls {
 		f.cancel()
@@ -353,7 +353,7 @@ type countingBenchmarkServiceExecutor struct {
 	cancel           context.CancelFunc
 }
 
-func (f *countingBenchmarkServiceExecutor) Execute(req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {
+func (f *countingBenchmarkServiceExecutor) Execute(ctx context.Context, req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {
 	f.calls++
 	if f.cancel != nil && f.cancelAfterCalls > 0 && f.calls == f.cancelAfterCalls {
 		f.cancel()

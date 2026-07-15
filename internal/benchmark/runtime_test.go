@@ -1,6 +1,7 @@
 package benchmark
 
 import (
+	"context"
 	"testing"
 
 	"gexec-sandbox/internal/api"
@@ -24,6 +25,7 @@ func TestRunTaskAppliesScaffoldPromptPrefix(t *testing.T) {
 	}
 
 	run := RunTask(
+		context.Background(),
 		task,
 		Scaffold{Name: "tool-assisted", PromptPrefix: "tool-assisted: "},
 		RunModeScaffolded,
@@ -66,6 +68,7 @@ func TestRunTaskWithGraderUsesInjectedGrader(t *testing.T) {
 	}
 
 	run := RunTaskWithGrader(
+		context.Background(),
 		task,
 		Scaffold{Name: "tool-assisted", PromptPrefix: "tool-assisted: "},
 		RunModeBaseline,
@@ -111,7 +114,7 @@ func TestDefaultGraderMarksMatchingStdoutAsPass(t *testing.T) {
 
 func TestCodeExecutionAdapterDelegatesToSandbox(t *testing.T) {
 	adapter := CodeExecutionAdapter{
-		Runner: func(req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {
+		Runner: func(ctx context.Context, req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {
 			if req.Language != "python" {
 				t.Fatalf("Language = %q, want python", req.Language)
 			}
@@ -119,7 +122,7 @@ func TestCodeExecutionAdapterDelegatesToSandbox(t *testing.T) {
 		},
 	}
 
-	resp, err := adapter.Execute(api.ExecutionRequest{Language: "python", SourceCode: "print('ok')"}, config.Config{})
+	resp, err := adapter.Execute(context.Background(), api.ExecutionRequest{Language: "python", SourceCode: "print('ok')"}, config.Config{})
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
@@ -132,7 +135,7 @@ type fakeExecutor struct {
 	resp api.ExecutionResponse
 }
 
-func (f fakeExecutor) Execute(req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {
+func (f fakeExecutor) Execute(ctx context.Context, req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {
 	return f.resp, nil
 }
 
@@ -141,7 +144,7 @@ type fakeLLMClient struct {
 	seenPrompt string
 }
 
-func (f *fakeLLMClient) GenerateCode(problem string, language string) (string, error) {
+func (f *fakeLLMClient) GenerateCode(ctx context.Context, problem string, language string) (string, error) {
 	f.seenPrompt = problem
 	return f.code, nil
 }

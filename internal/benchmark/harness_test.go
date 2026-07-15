@@ -1,6 +1,7 @@
 package benchmark
 
 import (
+	"context"
 	"testing"
 
 	"gexec-sandbox/internal/api"
@@ -22,7 +23,7 @@ type stubLLMClient struct {
 	code string
 }
 
-func (c stubLLMClient) GenerateCode(problem string, language string) (string, error) {
+func (c stubLLMClient) GenerateCode(ctx context.Context, problem string, language string) (string, error) {
 	return c.code, nil
 }
 
@@ -35,12 +36,12 @@ func TestRunEvaluationPassesTestCaseInputToSandbox(t *testing.T) {
 	})
 
 	var seenStdin string
-	runCodeInSandbox = func(req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {
+	runCodeInSandbox = func(ctx context.Context, req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {
 		seenStdin = req.Stdin
 		return api.ExecutionResponse{Stdout: req.Stdin}, nil
 	}
 
-	report := RunEvaluation([]Problem{
+	report := RunEvaluation(context.Background(), []Problem{
 		{
 			Description: "read stdin and echo it",
 			Language:    "go",
@@ -65,7 +66,7 @@ func TestRunEvaluationPassesTestCaseInputToSandbox(t *testing.T) {
 func TestRunEvaluationReturnsZeroRatesForEmptyProblems(t *testing.T) {
 	t.Setenv("OLLAMA_MODEL", "test-model")
 
-	report := RunEvaluation(nil, 1, stubLLMClient{})
+	report := RunEvaluation(context.Background(), nil, 1, stubLLMClient{})
 
 	if report.TotalProblems != 0 {
 		t.Fatalf("TotalProblems = %d, want 0", report.TotalProblems)

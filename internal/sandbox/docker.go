@@ -88,7 +88,7 @@ func readAttachedOutput(reader io.Reader) (string, string, error) {
 	return stdout.String(), stderr.String(), nil
 }
 
-func RunCodeInSandbox(req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {
+func RunCodeInSandbox(ctx context.Context, req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return api.ExecutionResponse{}, fmt.Errorf("failed to create docker client: %w", err)
@@ -102,12 +102,12 @@ func RunCodeInSandbox(req api.ExecutionRequest, cfg config.Config) (api.Executio
 	extension := getExtension(req.Language, cfg)
 	filePath := "/tmp/main" + extension
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(req.TimeoutMS)*time.Millisecond)
+	execCtx, cancel := context.WithTimeout(ctx, time.Duration(req.TimeoutMS)*time.Millisecond)
 	defer cancel()
 
-	pull, err := cli.ImagePull(ctx, imageName, image.PullOptions{})
+	pull, err := cli.ImagePull(execCtx, imageName, image.PullOptions{})
 	if err != nil {
-		if ctx.Err() != nil {
+		if execCtx.Err() != nil {
 			return api.ExecutionResponse{}, fmt.Errorf("execution timed out")
 		}
 		return api.ExecutionResponse{}, fmt.Errorf("failed to pull image: %w", err)
@@ -115,7 +115,7 @@ func RunCodeInSandbox(req api.ExecutionRequest, cfg config.Config) (api.Executio
 	defer pull.Close()
 
 	if _, err := io.Copy(io.Discard, pull); err != nil {
-		if ctx.Err() != nil {
+		if execCtx.Err() != nil {
 			return api.ExecutionResponse{}, fmt.Errorf("execution timed out")
 		}
 		return api.ExecutionResponse{}, fmt.Errorf("failed to read image pull output: %w", err)
@@ -155,7 +155,7 @@ func RunCodeInSandbox(req api.ExecutionRequest, cfg config.Config) (api.Executio
 		unregisterContainer(containerID)
 	}()
 
-	attachResp, err := cli.ContainerAttach(ctx, resp.ID, container.AttachOptions{
+	attachResp, err := cli.ContainerAttach(execCtx, resp.ID, container.AttachOptions{
 		Stream: true,
 		Stdout: true,
 		Stderr: true,
@@ -165,15 +165,15 @@ func RunCodeInSandbox(req api.ExecutionRequest, cfg config.Config) (api.Executio
 	}
 	defer attachResp.Close()
 
-	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+	if err := cli.ContainerStart(execCtx, resp.ID, container.StartOptions{}); err != nil {
 		return api.ExecutionResponse{}, fmt.Errorf("failed to start container: %w", err)
 	}
 
-	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
+	statusCh, errCh := cli.ContainerWait(execCtx, resp.ID, container.WaitConditionNotRunning)
 	select {
 	case err := <-errCh:
 		return api.ExecutionResponse{}, fmt.Errorf("error waiting for container: %w", err)
-	case <-ctx.Done():
+	case <-execCtx.Done():
 		return api.ExecutionResponse{}, fmt.Errorf("execution timed out")
 	case <-statusCh:
 	}
@@ -183,7 +183,7 @@ func RunCodeInSandbox(req api.ExecutionRequest, cfg config.Config) (api.Executio
 		return api.ExecutionResponse{}, fmt.Errorf("failed to read container output: %w", err)
 	}
 
-	inspect, err := cli.ContainerInspect(ctx, resp.ID)
+	inspect, err := cli.ContainerInspect(execCtx, resp.ID)
 	if err != nil {
 		return api.ExecutionResponse{}, fmt.Errorf("failed to inspect container: %w", err)
 	}

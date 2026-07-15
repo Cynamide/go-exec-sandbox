@@ -155,7 +155,7 @@ func (s BenchmarkService) Run(ctx context.Context) (BenchmarkReport, error) {
 			return BenchmarkReport{}, err
 		}
 
-		baselineRun := RunTaskWithGrader(task, *baselineScaffold, RunModeBaseline, s.Client, s.Executor, grader, s.Config)
+		baselineRun := RunTaskWithGrader(ctx, task, *baselineScaffold, RunModeBaseline, s.Client, s.Executor, grader, s.Config)
 		runs = append(runs, baselineRun)
 
 		if err := ctx.Err(); err != nil {
@@ -163,7 +163,7 @@ func (s BenchmarkService) Run(ctx context.Context) (BenchmarkReport, error) {
 		}
 
 		for _, scaffold := range scaffoldVariants {
-			runs = append(runs, RunTaskWithGrader(task, scaffold, RunModeScaffolded, s.Client, s.Executor, grader, s.Config))
+			runs = append(runs, RunTaskWithGrader(ctx, task, scaffold, RunModeScaffolded, s.Client, s.Executor, grader, s.Config))
 		}
 	}
 

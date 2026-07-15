@@ -63,7 +63,7 @@ func executeHandler(cfg config.Config) http.HandlerFunc {
 			req.TimeoutMS = cfg.DefaultTimeoutMS
 		}
 
-		response, err := sandbox.RunCodeInSandbox(req, cfg)
+		response, err := sandbox.RunCodeInSandbox(r.Context(), req, cfg)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
@@ -202,9 +202,11 @@ func runBenchmarkCLIWithContext(ctx context.Context, args []string, service benc
 
 func main() {
 	cfg := config.LoadConfig()
+	rootCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	log.Println("Checking Ollama availability...")
-	if err := llm.WaitForOllama(); err != nil {
+	if err := llm.WaitForOllama(rootCtx); err != nil {
 		log.Fatalf("Failed to connect to Ollama: %v", err)
 	}
 
@@ -216,10 +218,7 @@ func main() {
 	}
 
 	if len(os.Args) > 1 && os.Args[1] == "benchmark" {
-		cliCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-		defer stop()
-
-		output, err := runBenchmarkCLIWithContext(cliCtx, os.Args[1:], benchmarkService)
+		output, err := runBenchmarkCLIWithContext(rootCtx, os.Args[1:], benchmarkService)
 		if err != nil {
 			log.Fatalf("Failed to run benchmark CLI: %v", err)
 		}
@@ -239,9 +238,7 @@ func main() {
 		}
 	}()
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	<-rootCtx.Done()
 
 	log.Println("Shutting down server...")
 

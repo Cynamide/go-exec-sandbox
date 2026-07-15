@@ -1,13 +1,14 @@
 package benchmark
 
 import (
+	"context"
 	"gexec-sandbox/internal/api"
 	"gexec-sandbox/internal/config"
 	"gexec-sandbox/internal/sandbox"
 )
 
 type CodeExecutionAdapter struct {
-	Runner func(req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error)
+	Runner func(ctx context.Context, req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error)
 }
 
 func NewCodeExecutionAdapter() CodeExecutionAdapter {
@@ -16,6 +17,6 @@ func NewCodeExecutionAdapter() CodeExecutionAdapter {
 	}
 }
 
-func (a CodeExecutionAdapter) Execute(req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {
-	return a.Runner(req, cfg)
+func (a CodeExecutionAdapter) Execute(ctx context.Context, req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {
+	return a.Runner(ctx, req, cfg)
 }
