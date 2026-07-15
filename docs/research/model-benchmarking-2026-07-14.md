@@ -4,153 +4,53 @@ Date: 2026-07-14
 
 ## Direct Answer
 
-The hottest problem in model benchmarking right now is not LeetCode-style puzzle solving. It is **economically valuable, real-world task completion by agents**.
+The strongest current benchmark signal is not LeetCode-style puzzle solving. It is **economically valuable real-world task completion by agents**.
 
-Software engineering is still one of the clearest and highest-signal slices of that problem, but the benchmark market is broader now: it also includes ML engineering, spreadsheet and document work, browser and desktop automation, scientific workflows, and cross-occupation deliverables.
+The field is converging on benchmarks that measure:
 
-The strongest signal from current primary sources is a shift from static question-answer benchmarks toward:
+- real deliverables, not toy answers
+- tool use and multi-step workflows
+- freshness and contamination resistance
+- human or economic baselines
+- scaffold sensitivity, meaning how much a model improves when wrapped in a better workflow
 
-- real work products with direct economic value
-- long-horizon tasks that require tools, environments, and multiple steps
-- contamination-resistant, frequently refreshed evaluation sets
-- human-calibrated or economically grounded outcomes
-- multimodal workflows when the task involves documents, UIs, or desktop use
-
-## Why This Is The Current Center Of Gravity
-
-### 1. Software engineering remains a core high-value benchmark family
-
-The original [SWE-bench](https://arxiv.org/abs/2310.06770) frames real-world software engineering as a challenging testbed because it requires codebase edits, execution environments, and coordinated multi-file reasoning rather than isolated code generation.
-
-[SWE-bench Goes Live!](https://arxiv.org/abs/2505.23419) pushes the same idea further by making the benchmark live-updatable and explicitly calls out the limitations of static benchmarks: they age, narrow to a small repository set, and become vulnerable to overfitting and contamination.
-
-[SWE-Bench Pro](https://arxiv.org/abs/2509.16941) continues that trend toward harder, enterprise-level, long-horizon engineering tasks and positions the benchmark as a more realistic measure of professional software engineering agents.
-
-[HCAST](https://arxiv.org/abs/2503.17354) broadens the software-evaluation view further by grounding autonomy in human-calibrated task duration across software engineering, machine learning engineering, cybersecurity, and general reasoning.
-
-### 2. Economically grounded work benchmarks are the strongest signal overall
-
-[SWE-Lancer](https://arxiv.org/abs/2502.12115) evaluates frontier models on real freelance software engineering tasks with monetary value attached. That is a strong sign of where the field is heading: not just “can the model answer?”, but “can it produce deliverables people would pay for?”
-
-[GDPval](https://arxiv.org/abs/2510.04374) broadens that idea beyond coding and evaluates models on economically valuable tasks across 44 occupations. It explicitly frames benchmarking around authentic work deliverables and professional-quality outputs.
-
-[MLE-bench](https://arxiv.org/abs/2410.07095) shows that machine learning engineering is also a serious economic benchmark target: the benchmark is built from Kaggle competitions and measures whether agents can train models, prepare datasets, and run experiments well enough to earn medals.
-
-[ScienceAgentBench](https://arxiv.org/abs/2410.05080) extends the same idea into scientific discovery workflows, extracting tasks from peer-reviewed publications and validating them with subject-matter experts.
-
-[SpreadsheetBench](https://arxiv.org/abs/2406.14991) and [Mind2Web](https://arxiv.org/abs/2306.06070) show that spreadsheet and general web workflows are also benchmark-worthy because they reflect real office work and general computer use.
-
-### 3. Contamination-resistant, continuously refreshed benchmarks are in demand
-
-[LiveCodeBench](https://arxiv.org/abs/2403.07974) says older code benchmarks like HumanEval and MBPP are no longer sufficient and introduces a continuously updated, contamination-free coding benchmark with broader code capabilities.
-
-[LiveBench](https://arxiv.org/abs/2406.19314) makes the same point more generally for LLM evaluation: static benchmarks get contaminated and obsolete, so the benchmark itself needs to stay fresh and objective.
-
-### 4. Human preference leaderboards are popular, but not enough on their own
-
-[Chatbot Arena](https://arxiv.org/abs/2403.04132) is still one of the most referenced public leaderboards because it captures human preferences in a broad, practical way.
-
-At the same time, [The Leaderboard Illusion](https://arxiv.org/abs/2504.20879) shows that arena-style rankings can be distorted by selective disclosure, private testing, and data access asymmetries. So arena-style benchmarking is popular and influential, but it is not the most rigorous answer when you want a capability benchmark.
-
-### 5. Multimodal and computer-use benchmarks are also important
-
-[MMMU](https://arxiv.org/abs/2311.16502) and [MMMU-Pro](https://arxiv.org/abs/2409.02813) show that multimodal reasoning remains a serious capability area, especially when image understanding and text reasoning must be combined.
-
-[OSWorld2.0](https://arxiv.org/abs/2606.29537) shows the same shift in agent form: the benchmark is about long-horizon computer use in realistic workflows, not just answering questions.
-
-## What This Means For Benchmarking In Practice
-
-If the goal is to benchmark models in the way the field currently values most, the strongest categories are:
-
-1. **Economically valuable work-product benchmarks**
-2. **Software engineering agents**
-3. **ML engineering, scientific, and analytical workflows**
-4. **Contamination-resistant live benchmarks**
-5. **Human preference or arena-style ranking as a supplement, not the only metric**
-6. **Multimodal/document/UI/computer-use workflows when the use case demands it**
-
-That makes static “solve a coding puzzle” sets less aligned with current benchmarking pressure than task suites that look like:
-
-- real deliverables from software engineering, ML engineering, and scientific work
-- real freelance or occupational tasks with monetary value
-- office workflows
-- spreadsheet/document manipulation
-- browser and computer-use agents
-
-## Recommendation For This Repository's README Direction
-
-If the README is going to reflect the hottest benchmarking direction, it should emphasize:
-
-- economically valuable real-world tasks
-- agentic workflows with tools and environments
-- contamination-resistant evaluation
-- human-calibrated or deliverable-based scoring
-- software engineering as one important slice, not the whole story
-
-It should not present the project as primarily about LeetCode-style challenges.
+Software engineering remains an important slice of this, but the broader market includes ML engineering, scientific workflows, spreadsheets, browser use, and desktop/terminal automation.
 
 ## What Labs Seem To Prefer Right Now
 
-Across the current benchmark releases and lab-authored evaluation papers, the recurring preferences are:
+The current benchmark pattern is:
 
-- **Executable tasks over static QA**: benchmarks that can be run, tested, and automatically graded, not just answered.
-- **Real deliverables over toy outputs**: tasks tied to actual work products, codebases, spreadsheets, documents, or workflows.
-- **Freshness over saturation**: live or regularly refreshed task sources to reduce contamination and benchmark gaming.
-- **Human or economic baselines**: comparison against professionals, pay value, or time-to-complete rather than only model-vs-model scores.
-- **Tool use and multi-step behavior**: browsing, terminal use, function calling, repo edits, and computer use.
-- **Scaffold sensitivity**: measuring how much prompting, reasoning effort, context, or agent scaffold changes the result.
+- **Executable tasks over static QA**
+- **Real work products over toy outputs**
+- **Live or regularly refreshed sources over saturated datasets**
+- **Human, professional, or monetary baselines over only model-vs-model scores**
+- **Tool use, browsing, terminal work, and computer use**
+- **Scaffold-aware evaluation**
 
-The most concrete examples in the current sources are:
+That is why the moat is probably not another static benchmark. It is a **benchmark harness that measures task performance under different real-world scaffolds**.
 
-- [GDPval](https://arxiv.org/abs/2510.04374), which adds a public grading service and shows that increased reasoning effort, task context, and scaffolding improve performance.
-- [SWE-bench Goes Live!](https://arxiv.org/abs/2505.23419), which is live-updatable and grounded in ongoing GitHub issues.
-- [LiveCodeBench](https://arxiv.org/abs/2403.07974) and [LiveBench](https://arxiv.org/abs/2406.19314), which both argue that benchmarks need freshness and contamination resistance.
-- [BrowseComp](https://arxiv.org/abs/2504.12516), which targets persistent web search and is explicitly framed as a core browsing-agent capability.
-- [OSWorld](https://arxiv.org/abs/2404.07972) and [OSWorld2.0](https://arxiv.org/abs/2606.29537), which evaluate long-horizon computer use in real environments.
-- [SpreadsheetBench](https://arxiv.org/abs/2406.14991) and [SpreadsheetBench 2](https://arxiv.org/abs/2606.29955), which show the value of end-to-end business workflows.
-- [MLE-bench](https://arxiv.org/abs/2410.07095) and [ScienceAgentBench](https://arxiv.org/abs/2410.05080), which ground evaluation in real ML and scientific work.
-- [OctoBench](https://arxiv.org/abs/2601.10343), which directly evaluates scaffold-aware instruction following in repository-grounded agentic coding.
+That kind of harness can answer:
 
-## Benchmark Families Worth Watching
-
-If you are trying to build a moat around benchmarking infrastructure, the benchmark families that appear most strategically valuable are:
-
-- **Economic work delivery**: tasks with monetary value, professional baselines, and deliverable-quality grading.
-- **Repo and codebase change**: issue resolution, patch generation, test repair, and long-horizon engineering work.
-- **Tool-call correctness**: function calling, API orchestration, and structured action sequences.
-- **Browsing and web completion**: search persistence, web navigation, and task completion across live websites.
-- **Terminal and computer use**: shell workflows, filesystem manipulation, office tasks, and desktop automation.
-- **Scientific and analytical work**: ML engineering, data analysis, spreadsheet manipulation, and research workflows.
-
-## Moat Hypothesis For This Project
-
-The strongest differentiator for this project is likely not another static benchmark dataset. It is a **benchmark harness that measures task performance under different real-world scaffolds**.
-
-That would let the same task suite answer questions like:
-
-- How much does a bare model improve when given a specific prompt scaffold?
-- How much additional lift comes from tool use, retrieval, critic loops, or memory?
-- Which tasks are solved by the model alone versus by the full agent stack?
-- Which skills are robust across scaffolds, and which collapse when the scaffold changes?
-
-That direction fits the current research signal better than LeetCode-style problems because it measures the thing labs seem to care about most: whether a model can become economically useful when wrapped in the right workflow.
+- How much does a bare model improve with a prompt scaffold?
+- How much lift comes from tools, retrieval, critic loops, or memory?
+- Which tasks are solved by the model alone versus the full agent stack?
+- Which skills survive changes in the workflow, and which fall apart?
 
 ## Practical Positioning
 
-If you want this project to be useful to a lab or product team, the most attractive shape is probably:
+If you want this project to be useful to a lab or product team, the most attractive shape is:
 
 - a live-updatable benchmark of economically meaningful tasks
 - a harness that can run multiple scaffolds against the same tasks
 - automatic grading where possible, expert or human grading where needed
 - clear reporting of baseline model, scaffolded model, and scaffold delta
 
-That gives you a benchmark, a harness, and a diagnostics layer in one system, which is more defensible than a static benchmark alone.
+That gives you a benchmark, a harness, and a diagnostics layer in one system.
 
 ## Primary Sources
 
 - [SWE-bench](https://arxiv.org/abs/2310.06770)
 - [SWE-bench Goes Live!](https://arxiv.org/abs/2505.23419)
-- [SWE-Bench Pro](https://arxiv.org/abs/2509.16941)
 - [SWE-Lancer](https://arxiv.org/abs/2502.12115)
 - [GDPval](https://arxiv.org/abs/2510.04374)
 - [HCAST](https://arxiv.org/abs/2503.17354)
@@ -159,11 +59,13 @@ That gives you a benchmark, a harness, and a diagnostics layer in one system, wh
 - [BrowseComp](https://arxiv.org/abs/2504.12516)
 - [τ-bench](https://arxiv.org/abs/2406.12045)
 - [Chatbot Arena](https://arxiv.org/abs/2403.04132)
-- [ACEBench](https://arxiv.org/abs/2501.12851)
 - [The Leaderboard Illusion](https://arxiv.org/abs/2504.20879)
 - [MMMU](https://arxiv.org/abs/2311.16502)
 - [MMMU-Pro](https://arxiv.org/abs/2409.02813)
+- [OSWorld](https://arxiv.org/abs/2404.07972)
 - [OSWorld2.0](https://arxiv.org/abs/2606.29537)
-- [TUA-Bench](https://arxiv.org/abs/2606.28480)
+- [SpreadsheetBench](https://arxiv.org/abs/2406.14991)
 - [SpreadsheetBench 2](https://arxiv.org/abs/2606.29955)
+- [MLE-bench](https://arxiv.org/abs/2410.07095)
+- [ScienceAgentBench](https://arxiv.org/abs/2410.05080)
 - [OctoBench](https://arxiv.org/abs/2601.10343)
