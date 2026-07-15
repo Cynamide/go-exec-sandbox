@@ -25,20 +25,6 @@ import (
 	"golang.org/x/time/rate"
 )
 
-var benchmarkScaffolds = benchmark.ScaffoldCatalog{
-	Scaffolds: []benchmark.Scaffold{
-		{
-			Baseline: true,
-			Name:     "baseline",
-		},
-		{
-			Name:         "tool-assisted",
-			Description:  "Ask for a compact plan before coding and return only executable code.",
-			PromptPrefix: "First think through the solution briefly, then write the final code. Return only executable code.\n\n",
-		},
-	},
-}
-
 func executeHandler(cfg config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		metrics.IncrementRequest()
@@ -124,7 +110,7 @@ func buildMux(cfg config.Config, benchmarkService benchmark.BenchmarkServiceAPI)
 }
 
 func newBenchmarkService(cfg config.Config) (benchmark.BenchmarkService, error) {
-	tasks, err := loadBenchmarkTasks()
+	tasks, scaffolds, err := loadBenchmarkCatalogs()
 	if err != nil {
 		return benchmark.BenchmarkService{}, err
 	}
@@ -136,7 +122,7 @@ func newBenchmarkService(cfg config.Config) (benchmark.BenchmarkService, error) 
 
 	return benchmark.BenchmarkService{
 		Tasks:     tasks,
-		Scaffolds: benchmarkScaffolds,
+		Scaffolds: scaffolds,
 		Client:    client,
 		Executor:  benchmark.NewCodeExecutionAdapter(),
 		Grader:    benchmark.DefaultGrader{},
@@ -144,33 +130,66 @@ func newBenchmarkService(cfg config.Config) (benchmark.BenchmarkService, error) 
 	}, nil
 }
 
-func loadBenchmarkTasks() (benchmark.TaskCatalog, error) {
-	problemsPath, err := benchmarkProblemsPath()
+func loadBenchmarkCatalogs() (benchmark.TaskCatalog, benchmark.ScaffoldCatalog, error) {
+	tasksPath, err := benchmarkDataPath("tasks.json")
 	if err != nil {
-		return benchmark.TaskCatalog{}, err
+		return benchmark.TaskCatalog{}, benchmark.ScaffoldCatalog{}, err
 	}
 
-	payload, err := os.ReadFile(problemsPath)
+	scaffoldsPath, err := benchmarkDataPath("scaffolds.json")
 	if err != nil {
-		return benchmark.TaskCatalog{}, fmt.Errorf("read benchmark tasks: %w", err)
+		return benchmark.TaskCatalog{}, benchmark.ScaffoldCatalog{}, err
 	}
 
-	var tasks []benchmark.Task
-	if err := json.Unmarshal(payload, &tasks); err != nil {
-		return benchmark.TaskCatalog{}, fmt.Errorf("decode benchmark tasks: %w", err)
+	taskPayload, err := os.ReadFile(tasksPath)
+	if err != nil {
+		return benchmark.TaskCatalog{}, benchmark.ScaffoldCatalog{}, fmt.Errorf("read benchmark tasks: %w", err)
 	}
 
-	return benchmark.TaskCatalog{Tasks: tasks}, nil
+	scaffoldPayload, err := os.ReadFile(scaffoldsPath)
+	if err != nil {
+		return benchmark.TaskCatalog{}, benchmark.ScaffoldCatalog{}, fmt.Errorf("read benchmark scaffolds: %w", err)
+	}
+
+	var tasks benchmark.TaskCatalog
+	if err := json.Unmarshal(taskPayload, &tasks); err != nil {
+		return benchmark.TaskCatalog{}, benchmark.ScaffoldCatalog{}, fmt.Errorf("decode benchmark tasks: %w", err)
+	}
+
+	var scaffolds benchmark.ScaffoldCatalog
+	if err := json.Unmarshal(scaffoldPayload, &scaffolds); err != nil {
+		return benchmark.TaskCatalog{}, benchmark.ScaffoldCatalog{}, fmt.Errorf("decode benchmark scaffolds: %w", err)
+	}
+
+	return tasks, scaffolds, nil
 }
 
-func benchmarkProblemsPath() (string, error) {
+func benchmarkDataPath(name string) (string, error) {
 	_, currentFile, _, ok := runtime.Caller(0)
 	if !ok {
 		return "", fmt.Errorf("resolve evaluator source path")
 	}
 
 	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(currentFile), "..", ".."))
-	return filepath.Join(repoRoot, "data", "problems.json"), nil
+	return filepath.Join(repoRoot, "data", name), nil
+}
+
+func runBenchmarkCLI(args []string, service benchmark.BenchmarkServiceAPI) (string, error) {
+	if len(args) == 0 || args[0] != "benchmark" {
+		return "", fmt.Errorf("unsupported command")
+	}
+
+	report, err := service.Run(context.Background())
+	if err != nil {
+		return "", err
+	}
+
+	raw, err := json.Marshal(report)
+	if err != nil {
+		return "", err
+	}
+
+	return string(raw), nil
 }
 
 func main() {
@@ -186,6 +205,15 @@ func main() {
 	benchmarkService, err := newBenchmarkService(cfg)
 	if err != nil {
 		log.Fatalf("Failed to initialize benchmark service: %v", err)
+	}
+
+	if len(os.Args) > 1 && os.Args[1] == "benchmark" {
+		output, err := runBenchmarkCLI(os.Args[1:], benchmarkService)
+		if err != nil {
+			log.Fatalf("Failed to run benchmark CLI: %v", err)
+		}
+		fmt.Println(output)
+		return
 	}
 
 	server := &http.Server{

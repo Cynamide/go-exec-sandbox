@@ -1,0 +1,25 @@
+{
+  "scaffolds": [
+    {
+      "baseline": true,
+      "name": "baseline",
+      "description": "Run the task with the base prompt only."
+    },
+    {
+      "name": "tool-assisted",
+      "description": "Ask for a compact plan before coding and return only executable code.",
+      "prompt_prefix": "First think through the solution briefly, then write the final code. Return only executable code.\n\n",
+      "tools": [
+        "plan"
+      ]
+    },
+    {
+      "name": "retrieval-assisted",
+      "description": "Encourage checking the provided task details carefully before coding and then return only executable code.",
+      "prompt_prefix": "Review the task details carefully, identify the required output format, and then return only executable code.\n\n",
+      "tools": [
+        "task-brief"
+      ]
+    }
+  ]
+}
