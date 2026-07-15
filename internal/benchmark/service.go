@@ -164,6 +164,9 @@ func (s BenchmarkService) Run(ctx context.Context) (BenchmarkReport, error) {
 
 		for _, scaffold := range scaffoldVariants {
 			runs = append(runs, RunTaskWithGrader(ctx, task, scaffold, RunModeScaffolded, s.Client, s.Executor, grader, s.Config))
+			if err := ctx.Err(); err != nil {
+				return BenchmarkReport{}, err
+			}
 		}
 	}
 

@@ -129,7 +129,7 @@ func RunCodeInSandbox(ctx context.Context, req api.ExecutionRequest, cfg config.
 	}
 	fullCmd := fmt.Sprintf("%s && %s", sourceCmd, runCmd)
 
-	resp, err := cli.ContainerCreate(ctx, &container.Config{
+	resp, err := cli.ContainerCreate(execCtx, &container.Config{
 		Image:           imageName,
 		Cmd:             []string{"sh", "-c", fullCmd},
 		Tty:             false,

@@ -256,6 +256,57 @@ func TestBenchmarkServiceRunReturnsErrorWhenContextCanceledBetweenTasks(t *testi
 	}
 }
 
+func TestBenchmarkServiceRunReturnsErrorWhenContextCanceledDuringFinalScaffold(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	client := &countingBenchmarkServiceLLMClient{
+		codeByPrompt: map[string]string{
+			"task-1":         "print('one')",
+			"tool: task-1":   "print('one')",
+			"critic: task-1": "print('one')",
+		},
+		cancelAfterCalls: 3,
+		cancel:           cancel,
+	}
+	executor := &countingBenchmarkServiceExecutor{
+		responseBySource: map[string]api.ExecutionResponse{
+			"print('one')": {Stdout: "ok"},
+		},
+	}
+	svc := BenchmarkService{
+		Tasks: TaskCatalog{
+			Tasks: []Task{{
+				ID:          "task-1",
+				Description: "task-1",
+				TaskFamily:  "software_engineering",
+				Language:    "python",
+				TestCases: []TestCase{{
+					ExpectedOutput: "ok",
+				}},
+			}},
+		},
+		Scaffolds: ScaffoldCatalog{
+			Scaffolds: []Scaffold{
+				{Baseline: true, Name: "baseline"},
+				{Name: "tool-assisted", PromptPrefix: "tool: "},
+				{Name: "critic", PromptPrefix: "critic: "},
+			},
+		},
+		Client:   client,
+		Executor: executor,
+		Grader:   DefaultGrader{},
+	}
+
+	_, err := svc.Run(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Run() error = %v, want %v", err, context.Canceled)
+	}
+
+	if client.calls != 3 {
+		t.Fatalf("client calls = %d, want 3", client.calls)
+	}
+}
+
 func TestBenchmarkServiceRunReturnsErrorWhenClientMissing(t *testing.T) {
 	svc := BenchmarkService{
 		Scaffolds: ScaffoldCatalog{
