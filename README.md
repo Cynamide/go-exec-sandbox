@@ -99,12 +99,15 @@ docker exec -it <container_id> ollama pull qwen3:4b
 # Start the evaluator
 go run ./cmd/evaluator
 
+# Run the benchmark CLI and print a JSON report to stdout
+go run ./cmd/evaluator benchmark
+
 # Or build and run
 go build -o evaluator ./cmd/evaluator
 ./evaluator
 ```
 
-The evaluator will start on `http://localhost:8080`
+The evaluator will start on `http://localhost:8080`. The `benchmark` mode uses the same shared benchmark service and prints the report as JSON instead of starting the HTTP server.
 
 ### Using Docker (Standalone)
 
@@ -308,7 +311,9 @@ gexec-sandbox/
 │   └── evaluator/
 │       └── main.go          # HTTP server, LLM integration, graceful shutdown, and handlers
 ├── data/
-│   └── problems.json        # Benchmark task dataset
+│   ├── tasks.json           # Benchmark task catalog
+│   ├── scaffolds.json       # Benchmark scaffold catalog
+│   └── problems.json        # Legacy toy benchmark dataset
 ├── internal/
 │   ├── api/
 │   │   └── types.go         # Request/response types
@@ -432,7 +437,7 @@ This project is being developed as a benchmark harness for economically meaningf
 
 - **Benchmarking Pipeline**
   - ✅ Benchmark harness infrastructure (internal/benchmark/)
-  - ✅ Problem dataset structure (data/problems.json)
+  - ✅ Task and scaffold catalog structure (data/tasks.json, data/scaffolds.json)
   - ✅ Integration of LLM code generation with execution
   - ✅ Dataset management system for tasks and test cases
 
@@ -451,7 +456,7 @@ This project is being developed as a benchmark harness for economically meaningf
   - 🚧 Batch evaluation mode for comparing multiple models
   - 🚧 Result caching and persistence
   - 🚧 Progress tracking and status reporting
-  - 🚧 Web UI or CLI interface for running benchmarks
+  - ✅ Benchmark CLI mode for running benchmarks locally
 
 ### 🎯 Future Enhancements
 
