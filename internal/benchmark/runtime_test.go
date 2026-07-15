@@ -65,7 +65,7 @@ func TestRunTaskWithGraderUsesInjectedGrader(t *testing.T) {
 		outcome: Outcome{Passed: false, Score: 0.25},
 	}
 
-	run := runTaskWithGrader(
+	run := RunTaskWithGrader(
 		task,
 		Scaffold{Name: "tool-assisted", PromptPrefix: "tool-assisted: "},
 		RunModeBaseline,
