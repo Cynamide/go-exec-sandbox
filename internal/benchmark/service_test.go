@@ -24,20 +24,23 @@ func TestBenchmarkServiceRunReturnsReport(t *testing.T) {
 		},
 		Scaffolds: ScaffoldCatalog{
 			Scaffolds: []Scaffold{
-				{Name: "baseline"},
+				{Baseline: true, Name: "baseline"},
 				{Name: "tool-assisted", PromptPrefix: "tool: "},
+				{Name: "critic", PromptPrefix: "critic: "},
 			},
 		},
 		Client: benchmarkServiceLLMClient{
 			codeByPrompt: map[string]string{
-				"demo":       "print('baseline')",
-				"tool: demo": "print('scaffolded')",
+				"demo":         "print('baseline')",
+				"tool: demo":   "print('scaffolded')",
+				"critic: demo": "print('critic')",
 			},
 		},
 		Executor: benchmarkServiceExecutor{
 			responseBySource: map[string]api.ExecutionResponse{
 				"print('baseline')":   {Stdout: "baseline"},
 				"print('scaffolded')": {Stdout: "scaffolded"},
+				"print('critic')":     {Stdout: "wrong"},
 			},
 		},
 		Grader: DefaultGrader{},
@@ -57,8 +60,8 @@ func TestBenchmarkServiceRunReturnsReport(t *testing.T) {
 		t.Fatalf("len(Baseline.Runs) = %d, want 1", len(report.Baseline.Runs))
 	}
 
-	if len(report.Scaffolded.Runs) != 1 {
-		t.Fatalf("len(Scaffolded.Runs) = %d, want 1", len(report.Scaffolded.Runs))
+	if len(report.Scaffolded.Runs) != 2 {
+		t.Fatalf("len(Scaffolded.Runs) = %d, want 2", len(report.Scaffolded.Runs))
 	}
 
 	if report.Baseline.Runs[0].Mode != RunModeBaseline {
@@ -79,6 +82,26 @@ func TestBenchmarkServiceRunReturnsReport(t *testing.T) {
 
 	if report.Lift != 1 {
 		t.Fatalf("Lift = %v, want 1", report.Lift)
+	}
+
+	if len(report.Scaffolds) != 2 {
+		t.Fatalf("len(Scaffolds) = %d, want 2", len(report.Scaffolds))
+	}
+
+	if report.Scaffolds[0].Scaffold.Name != "critic" {
+		t.Fatalf("Scaffolds[0].Scaffold.Name = %q, want critic", report.Scaffolds[0].Scaffold.Name)
+	}
+
+	if report.Scaffolds[0].Group.SuccessRate != 0 {
+		t.Fatalf("Scaffolds[0].Group.SuccessRate = %v, want 0", report.Scaffolds[0].Group.SuccessRate)
+	}
+
+	if report.Scaffolds[1].Scaffold.Name != "tool-assisted" {
+		t.Fatalf("Scaffolds[1].Scaffold.Name = %q, want tool-assisted", report.Scaffolds[1].Scaffold.Name)
+	}
+
+	if report.Scaffolds[1].Group.SuccessRate != 1 {
+		t.Fatalf("Scaffolds[1].Group.SuccessRate = %v, want 1", report.Scaffolds[1].Group.SuccessRate)
 	}
 }
 
@@ -102,7 +125,7 @@ func TestBenchmarkServiceRunReturnsErrorWhenContextCanceledBeforeWorkBegins(t *t
 		},
 		Scaffolds: ScaffoldCatalog{
 			Scaffolds: []Scaffold{
-				{Name: "baseline"},
+				{Baseline: true, Name: "baseline"},
 				{Name: "tool-assisted", PromptPrefix: "tool: "},
 			},
 		},
@@ -135,14 +158,14 @@ func TestBenchmarkServiceRunReturnsErrorWhenContextCanceledBetweenTasks(t *testi
 			"task-2":       "print('two')",
 			"tool: task-2": "print('two')",
 		},
-		cancelAfterCalls: 2,
-		cancel:           cancel,
 	}
 	executor := &countingBenchmarkServiceExecutor{
 		responseBySource: map[string]api.ExecutionResponse{
 			"print('one')": {Stdout: "ok"},
 			"print('two')": {Stdout: "ok"},
 		},
+		cancelAfterCalls: 1,
+		cancel:           cancel,
 	}
 	svc := BenchmarkService{
 		Tasks: TaskCatalog{
@@ -169,7 +192,7 @@ func TestBenchmarkServiceRunReturnsErrorWhenContextCanceledBetweenTasks(t *testi
 		},
 		Scaffolds: ScaffoldCatalog{
 			Scaffolds: []Scaffold{
-				{Name: "baseline"},
+				{Baseline: true, Name: "baseline"},
 				{Name: "tool-assisted", PromptPrefix: "tool: "},
 			},
 		},
@@ -183,19 +206,19 @@ func TestBenchmarkServiceRunReturnsErrorWhenContextCanceledBetweenTasks(t *testi
 		t.Fatalf("Run() error = %v, want %v", err, context.Canceled)
 	}
 
-	if client.calls != 2 {
-		t.Fatalf("client calls = %d, want 2", client.calls)
+	if client.calls != 1 {
+		t.Fatalf("client calls = %d, want 1", client.calls)
 	}
 
-	if executor.calls != 2 {
-		t.Fatalf("executor calls = %d, want 2", executor.calls)
+	if executor.calls != 1 {
+		t.Fatalf("executor calls = %d, want 1", executor.calls)
 	}
 }
 
 func TestBenchmarkServiceRunReturnsErrorWhenClientMissing(t *testing.T) {
 	svc := BenchmarkService{
 		Scaffolds: ScaffoldCatalog{
-			Scaffolds: []Scaffold{{Name: "baseline"}, {Name: "tool-assisted"}},
+			Scaffolds: []Scaffold{{Baseline: true, Name: "baseline"}, {Name: "tool-assisted"}},
 		},
 		Executor: &countingBenchmarkServiceExecutor{},
 	}
@@ -209,7 +232,7 @@ func TestBenchmarkServiceRunReturnsErrorWhenClientMissing(t *testing.T) {
 func TestBenchmarkServiceRunReturnsErrorWhenExecutorMissing(t *testing.T) {
 	svc := BenchmarkService{
 		Scaffolds: ScaffoldCatalog{
-			Scaffolds: []Scaffold{{Name: "baseline"}, {Name: "tool-assisted"}},
+			Scaffolds: []Scaffold{{Baseline: true, Name: "baseline"}, {Name: "tool-assisted"}},
 		},
 		Client: &countingBenchmarkServiceLLMClient{},
 	}
@@ -225,13 +248,28 @@ func TestBenchmarkServiceRunReturnsErrorWhenScaffoldsInsufficient(t *testing.T) 
 		Client:   &countingBenchmarkServiceLLMClient{},
 		Executor: &countingBenchmarkServiceExecutor{},
 		Scaffolds: ScaffoldCatalog{
-			Scaffolds: []Scaffold{{Name: "baseline"}},
+			Scaffolds: []Scaffold{{Baseline: true, Name: "baseline"}},
 		},
 	}
 
 	_, err := svc.Run(context.Background())
-	if err == nil || err.Error() != "need at least two scaffolds" {
-		t.Fatalf("Run() error = %v, want need at least two scaffolds", err)
+	if err == nil || err.Error() != "need at least one scaffolded scaffold" {
+		t.Fatalf("Run() error = %v, want need at least one scaffolded scaffold", err)
+	}
+}
+
+func TestBenchmarkServiceRunReturnsErrorWhenBaselineMissing(t *testing.T) {
+	svc := BenchmarkService{
+		Client:   &countingBenchmarkServiceLLMClient{},
+		Executor: &countingBenchmarkServiceExecutor{},
+		Scaffolds: ScaffoldCatalog{
+			Scaffolds: []Scaffold{{Name: "tool-assisted"}},
+		},
+	}
+
+	_, err := svc.Run(context.Background())
+	if err == nil || err.Error() != "baseline scaffold is required" {
+		t.Fatalf("Run() error = %v, want baseline scaffold is required", err)
 	}
 }
 
@@ -252,10 +290,10 @@ func (f benchmarkServiceExecutor) Execute(req api.ExecutionRequest, cfg config.C
 }
 
 type countingBenchmarkServiceLLMClient struct {
-	codeByPrompt      map[string]string
-	calls             int
-	cancelAfterCalls  int
-	cancel            context.CancelFunc
+	codeByPrompt     map[string]string
+	calls            int
+	cancelAfterCalls int
+	cancel           context.CancelFunc
 }
 
 func (f *countingBenchmarkServiceLLMClient) GenerateCode(problem string, language string) (string, error) {
@@ -270,17 +308,22 @@ func (f *countingBenchmarkServiceLLMClient) GenerateCode(problem string, languag
 type countingBenchmarkServiceExecutor struct {
 	responseBySource map[string]api.ExecutionResponse
 	calls            int
+	cancelAfterCalls int
+	cancel           context.CancelFunc
 }
 
 func (f *countingBenchmarkServiceExecutor) Execute(req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {
 	f.calls++
+	if f.cancel != nil && f.cancelAfterCalls > 0 && f.calls == f.cancelAfterCalls {
+		f.cancel()
+	}
 	return f.responseBySource[req.SourceCode], nil
 }
 
 func TestBuildBenchmarkReportSeparatesBaselineAndScaffoldedRuns(t *testing.T) {
 	report := BuildBenchmarkReport([]Task{{ID: "task-1"}}, []Run{
-		{TaskID: "task-1", Mode: RunModeBaseline, Passed: false},
-		{TaskID: "task-1", Mode: RunModeScaffolded, Passed: true},
+		{TaskID: "task-1", Mode: RunModeBaseline, Passed: false, Scaffold: Scaffold{Baseline: true, Name: "baseline"}},
+		{TaskID: "task-1", Mode: RunModeScaffolded, Passed: true, Scaffold: Scaffold{Name: "tool-assisted"}},
 	})
 
 	if len(report.Baseline.Runs) != 1 {
@@ -301,5 +344,17 @@ func TestBuildBenchmarkReportSeparatesBaselineAndScaffoldedRuns(t *testing.T) {
 
 	if report.Lift != 1 {
 		t.Fatalf("Lift = %v, want 1", report.Lift)
+	}
+
+	if len(report.Scaffolds) != 1 {
+		t.Fatalf("len(Scaffolds) = %d, want 1", len(report.Scaffolds))
+	}
+
+	if report.Scaffolds[0].Scaffold.Name != "tool-assisted" {
+		t.Fatalf("Scaffolds[0].Scaffold.Name = %q, want tool-assisted", report.Scaffolds[0].Scaffold.Name)
+	}
+
+	if report.Scaffolds[0].Group.SuccessRate != 1 {
+		t.Fatalf("Scaffolds[0].Group.SuccessRate = %v, want 1", report.Scaffolds[0].Group.SuccessRate)
 	}
 }

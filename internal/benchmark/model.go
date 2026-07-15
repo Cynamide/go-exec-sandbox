@@ -10,6 +10,7 @@ type Task struct {
 }
 
 type Scaffold struct {
+	Baseline     bool     `json:"baseline,omitempty"`
 	Name         string   `json:"name"`
 	Description  string   `json:"description"`
 	PromptPrefix string   `json:"prompt_prefix"`
