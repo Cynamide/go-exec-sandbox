@@ -1,24 +1,60 @@
-# Files Changed
+# Task 2 Report: Expose Benchmark Service Over HTTP
 
-- `internal/benchmark/types.go`
-- `.superpowers/sdd/task-2-report.md`
+## What I Implemented
 
-# Tests Run
+- Added a thin HTTP adapter at `internal/httpapi/benchmark_handler.go`.
+- The handler accepts `POST /benchmark/run`, calls `benchmark.BenchmarkServiceAPI.Run`, and JSON-encodes the returned `benchmark.BenchmarkReport`.
+- The handler rejects non-`POST` requests with `405 Method Not Allowed`.
+- The handler returns service errors as `400 Bad Request`, preserving the existing benchmark-core behavior rather than adding new translation logic.
+- Registered the route in `cmd/evaluator/main.go` with minimal structural wiring:
+  - `mux.Handle("/benchmark/run", httpapi.BenchmarkRunHandler{...})`
+  - The route uses `benchmark.BenchmarkService{Config: cfg}` as the concrete service shape for now.
+- Added a focused handler test at `internal/httpapi/benchmark_handler_test.go` that verifies a successful `POST` returns `200 OK` and benchmark-report JSON.
 
-- `env GOCACHE=/private/tmp/go-build-task2 go test ./internal/benchmark -run 'TestProblemCompatibilityAliasSupportsCurrentFixtureShape|TestTaskJSONRoundTripPreservesFamily' -v`
+## What I Tested
 
-# Results
+### Red/Green TDD Check
 
-- Added a compatibility comment above `type Problem = Task` so Task 2 explicitly touches the alias file while preserving behavior.
-- Re-verified that the legacy `Problem` fixture shape still aliases `Task` and that `Task` JSON round-trips preserve `TaskFamily`.
-- The benchmark verification test run passed.
+1. Added `TestBenchmarkRunHandlerReturnsJSON`.
+2. Ran:
 
-# Self-Review
+```bash
+go test ./internal/httpapi -run TestBenchmarkRunHandlerReturnsJSON -v
+```
 
-- Kept the write scope limited to the compatibility alias file and this task report.
-- Preserved the existing `type Problem = Task` behavior exactly; the code change is comment-only.
-- Rechecked the diff to ensure no unrelated benchmark behavior changed.
+Initial result: compile failure as expected because `BenchmarkRunHandler` did not exist yet.
 
-# Concerns
+3. Implemented the handler and reran the same test.
 
-- The alias behavior was already correct before this fix, so the implementation delta is intentionally a no-op compatibility annotation rather than a functional change.
+Result: PASS.
+
+### Focused Verification
+
+Ran:
+
+```bash
+go test ./internal/httpapi ./cmd/evaluator ./internal/benchmark -v
+```
+
+Results:
+- `internal/httpapi`: PASS
+- `cmd/evaluator`: builds successfully (`[no test files]`)
+- `internal/benchmark`: PASS, including the existing benchmark service and adapter tests
+
+## Files Changed
+
+- `internal/httpapi/benchmark_handler.go`
+- `internal/httpapi/benchmark_handler_test.go`
+- `cmd/evaluator/main.go`
+
+## Self-Review Findings
+
+- The HTTP adapter is intentionally thin and does not modify benchmark-core behavior.
+- The route registration is minimal and does not introduce task-registry, fixture-loading, or service-construction architecture ahead of the planned tasks.
+- The handler test covers the primary success path described in the task brief.
+
+## Issues / Concerns
+
+- There is still no production fixture/registry loader in this task slice, so the current main wiring uses a structurally valid `benchmark.BenchmarkService{Config: cfg}` without task/scaffold/client/executor dependencies.
+- As a result, `POST /benchmark/run` is registered and reachable, but it will currently return a service error such as `llm client is required` until the later task wires real benchmark inputs and dependencies into the service.
+- I did not add a `cmd/evaluator` route-registration test because there is no existing mux-construction seam in `main`, and the brief asked for minimal wiring only.

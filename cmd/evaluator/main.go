@@ -12,7 +12,9 @@ import (
 	"time"
 
 	"gexec-sandbox/internal/api"
+	"gexec-sandbox/internal/benchmark"
 	"gexec-sandbox/internal/config"
+	"gexec-sandbox/internal/httpapi"
 	"gexec-sandbox/internal/llm"
 	"gexec-sandbox/internal/metrics"
 	"gexec-sandbox/internal/middleware"
@@ -102,6 +104,12 @@ func main() {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(metrics.GetMetrics())
+	})
+
+	mux.Handle("/benchmark/run", httpapi.BenchmarkRunHandler{
+		Service: benchmark.BenchmarkService{
+			Config: cfg,
+		},
 	})
 
 	mux.Handle("/execute", middleware.RateLimitMiddleware(rate.Every(6*time.Second), 10)(http.HandlerFunc(executeHandler(cfg))))
