@@ -84,6 +84,10 @@ type BenchmarkService struct {
 }
 
 func (s BenchmarkService) Run(ctx context.Context) (BenchmarkReport, error) {
+	if err := ctx.Err(); err != nil {
+		return BenchmarkReport{}, err
+	}
+
 	if s.Client == nil {
 		return BenchmarkReport{}, fmt.Errorf("llm client is required")
 	}
@@ -103,6 +107,10 @@ func (s BenchmarkService) Run(ctx context.Context) (BenchmarkReport, error) {
 
 	runs := make([]Run, 0, len(s.Tasks.Tasks)*2)
 	for _, task := range s.Tasks.Tasks {
+		if err := ctx.Err(); err != nil {
+			return BenchmarkReport{}, err
+		}
+
 		runs = append(runs,
 			RunTaskWithGrader(task, s.Scaffolds.Scaffolds[0], RunModeBaseline, s.Client, s.Executor, grader, s.Config),
 			RunTaskWithGrader(task, s.Scaffolds.Scaffolds[1], RunModeScaffolded, s.Client, s.Executor, grader, s.Config),
