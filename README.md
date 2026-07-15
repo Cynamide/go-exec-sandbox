@@ -34,11 +34,11 @@ Dependencies are automatically downloaded when you run `go mod download` or `go 
 This service uses Docker containers to isolate user code execution:
 
 - **Network Disabled**: Containers run with network access disabled to prevent unauthorized network calls
-- **Resource Limits**: Memory and CPU quotas restrict resource usage (default: 128MB, 50k CPU quota)
+- **Resource Limits**: Memory and CPU quotas restrict resource usage (default: 256MB, 50k CPU quota)
 - **Ephemeral Containers**: Containers are automatically removed after execution
 - **Context Timeouts**: Execution is enforced with context timeouts to prevent hanging processes
 - **Graceful Shutdown**: Server catches SIGINT/SIGTERM signals and properly cleans up all active containers
-- **Rate Limiting**: In-memory IP-based rate limiting prevents abuse (10 requests/minute with 2 burst)
+- **Rate Limiting**: In-memory IP-based rate limiting prevents abuse (10 requests/minute with 10 burst)
 
 > ⚠️ **Important**: While Docker provides strong isolation, this service should still be run behind additional security layers (authentication, firewall, etc.) in production environments.
 
@@ -179,7 +179,7 @@ The `/execute` endpoint is rate limited to **10 requests per minute per IP addre
 }
 ```
 
-You can adjust the rate limit in `cmd/server/main.go` by modifying the `RateLimitMiddleware` parameters.
+You can adjust the rate limit in `cmd/evaluator/main.go` by modifying the `RateLimitMiddleware` parameters.
 
 ## Example Commands
 

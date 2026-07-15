@@ -5,8 +5,8 @@ import (
 )
 
 type Metrics struct {
-	TotalRequests uint64
-	TotalErrors   uint64
+	TotalRequests uint64 `json:"total_requests"`
+	TotalErrors   uint64 `json:"total_errors"`
 }
 
 var (
