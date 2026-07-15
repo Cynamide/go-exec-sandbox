@@ -1,6 +1,9 @@
 package benchmark
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
 func TestScaffoldAppliesPromptPrefix(t *testing.T) {
 	scaffold := Scaffold{
@@ -32,5 +35,30 @@ func TestProblemCompatibilityAliasSupportsCurrentFixtureShape(t *testing.T) {
 
 	if problem.TaskFamily != "" {
 		t.Fatalf("TaskFamily = %q, want empty string", problem.TaskFamily)
+	}
+}
+
+func TestTaskJSONRoundTripPreservesFamily(t *testing.T) {
+	task := Task{
+		ID:          "task-1",
+		Title:       "Example",
+		Description: "demo",
+		TaskFamily:  "software_engineering",
+		Language:    "python",
+		TestCases:   []TestCase{{Input: "1", ExpectedOutput: "1"}},
+	}
+
+	raw, err := json.Marshal(task)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+
+	var got Task
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+
+	if got.TaskFamily != "software_engineering" {
+		t.Fatalf("TaskFamily = %q, want %q", got.TaskFamily, "software_engineering")
 	}
 }
