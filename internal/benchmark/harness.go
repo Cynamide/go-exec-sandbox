@@ -6,14 +6,14 @@ import (
 
 	"gexec-sandbox/internal/api"
 	"gexec-sandbox/internal/config"
-	"gexec-sandbox/internal/sandbox"
 )
 
 type LLMClient interface {
 	GenerateCode(problem string, language string) (string, error)
 }
 
-var runCodeInSandbox = sandbox.RunCodeInSandbox
+var defaultCodeExecutionAdapter = NewCodeExecutionAdapter()
+var runCodeInSandbox = defaultCodeExecutionAdapter.Execute
 
 type Report struct {
 	TotalProblems  int     `json:"total_problems"`
