@@ -175,11 +175,19 @@ func benchmarkDataPath(name string) (string, error) {
 }
 
 func runBenchmarkCLI(args []string, service benchmark.BenchmarkServiceAPI) (string, error) {
+	return runBenchmarkCLIWithContext(context.Background(), args, service)
+}
+
+func runBenchmarkCLIWithContext(ctx context.Context, args []string, service benchmark.BenchmarkServiceAPI) (string, error) {
 	if len(args) == 0 || args[0] != "benchmark" {
 		return "", fmt.Errorf("unsupported command")
 	}
 
-	report, err := service.Run(context.Background())
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+
+	report, err := service.Run(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -208,7 +216,10 @@ func main() {
 	}
 
 	if len(os.Args) > 1 && os.Args[1] == "benchmark" {
-		output, err := runBenchmarkCLI(os.Args[1:], benchmarkService)
+		cliCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
+
+		output, err := runBenchmarkCLIWithContext(cliCtx, os.Args[1:], benchmarkService)
 		if err != nil {
 			log.Fatalf("Failed to run benchmark CLI: %v", err)
 		}
