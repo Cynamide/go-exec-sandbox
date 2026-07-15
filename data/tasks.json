@@ -10,6 +10,10 @@
         {
           "input": "api|feature|Added audit logging\nweb|fix|Fixed checkout redirect\napi|fix|Patched token refresh\n",
           "expected_output": "api: 2 changes\nweb: 1 changes"
+        },
+        {
+          "input": "search|feature|Added filters\napi|fix|Patched token refresh\nsearch|fix|Reduced latency\n",
+          "expected_output": "api: 1 changes\nsearch: 2 changes"
         }
       ]
     },
@@ -23,6 +27,10 @@
         {
           "input": "Checkout failed\nNetwork timeout\nCheckout failed\n",
           "expected_output": "Checkout failed: 2\nNetwork timeout: 1"
+        },
+        {
+          "input": "Timeout\nTimeout\nAuth failed\nAuth failed\nAuth failed\n",
+          "expected_output": "Auth failed: 3\nTimeout: 2"
         }
       ]
     },
@@ -36,6 +44,10 @@
         {
           "input": "month,amount\n2026-05,10\n2026-05,15\n2026-06,7\n",
           "expected_output": "2026-05,25\n2026-06,7"
+        },
+        {
+          "input": "month,amount\n2026-04,5\n2026-03,8\n2026-04,2\n2026-05,1\n2026-03,7\n",
+          "expected_output": "2026-04,7\n2026-03,15\n2026-05,1"
         }
       ]
     },
@@ -49,6 +61,10 @@
         {
           "input": "alex open\nsam closed\nalex open\nmira open\n",
           "expected_output": "alex 2\nmira 1"
+        },
+        {
+          "input": "alex open\nmira open\nalex closed\nzoe open\nmira open\nzoe closed\n",
+          "expected_output": "alex 1\nmira 2\nzoe 1"
         }
       ]
     }

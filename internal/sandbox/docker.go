@@ -108,7 +108,7 @@ func RunCodeInSandbox(ctx context.Context, req api.ExecutionRequest, cfg config.
 	pull, err := cli.ImagePull(execCtx, imageName, image.PullOptions{})
 	if err != nil {
 		if execCtx.Err() != nil {
-			return api.ExecutionResponse{}, fmt.Errorf("execution timed out")
+			return api.ExecutionResponse{}, execCtx.Err()
 		}
 		return api.ExecutionResponse{}, fmt.Errorf("failed to pull image: %w", err)
 	}
@@ -116,7 +116,7 @@ func RunCodeInSandbox(ctx context.Context, req api.ExecutionRequest, cfg config.
 
 	if _, err := io.Copy(io.Discard, pull); err != nil {
 		if execCtx.Err() != nil {
-			return api.ExecutionResponse{}, fmt.Errorf("execution timed out")
+			return api.ExecutionResponse{}, execCtx.Err()
 		}
 		return api.ExecutionResponse{}, fmt.Errorf("failed to read image pull output: %w", err)
 	}
@@ -174,7 +174,7 @@ func RunCodeInSandbox(ctx context.Context, req api.ExecutionRequest, cfg config.
 	case err := <-errCh:
 		return api.ExecutionResponse{}, fmt.Errorf("error waiting for container: %w", err)
 	case <-execCtx.Done():
-		return api.ExecutionResponse{}, fmt.Errorf("execution timed out")
+		return api.ExecutionResponse{}, execCtx.Err()
 	case <-statusCh:
 	}
 

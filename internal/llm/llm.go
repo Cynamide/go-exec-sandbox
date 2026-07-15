@@ -78,7 +78,7 @@ func WaitForOllama(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("timed out waiting for Ollama")
+			return ctx.Err()
 		case <-ticker.C:
 			log.Println("Checking Ollama availability...")
 			_, err := client.List(ctx)
