@@ -78,19 +78,19 @@ func BuildBenchmarkReport(tasks []Task, runs []Run) BenchmarkReport {
 }
 
 func buildBenchmarkRunGroup(totalTasks int, runs []Run) BenchmarkRunGroup {
-	passedTasks := 0
+	passedTaskIDs := map[string]struct{}{}
 	for _, run := range runs {
 		if run.Passed {
-			passedTasks++
+			passedTaskIDs[run.TaskID] = struct{}{}
 		}
 	}
 
 	group := BenchmarkRunGroup{
 		Runs:        runs,
-		PassedTasks: passedTasks,
+		PassedTasks: len(passedTaskIDs),
 	}
 	if totalTasks > 0 {
-		group.SuccessRate = float64(passedTasks) / float64(totalTasks)
+		group.SuccessRate = float64(group.PassedTasks) / float64(totalTasks)
 	}
 
 	return group

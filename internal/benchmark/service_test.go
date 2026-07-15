@@ -105,6 +105,47 @@ func TestBenchmarkServiceRunReturnsReport(t *testing.T) {
 	}
 }
 
+func TestBuildBenchmarkReportCountsScaffoldedTasksOnce(t *testing.T) {
+	report := BuildBenchmarkReport(
+		[]Task{{
+			ID:         "task-1",
+			TaskFamily: "software_engineering",
+		}},
+		[]Run{
+			{
+				TaskID:   "task-1",
+				Mode:     RunModeBaseline,
+				Scaffold: Scaffold{Name: "baseline", Baseline: true},
+				Passed:   false,
+			},
+			{
+				TaskID:   "task-1",
+				Mode:     RunModeScaffolded,
+				Scaffold: Scaffold{Name: "tool-assisted"},
+				Passed:   true,
+			},
+			{
+				TaskID:   "task-1",
+				Mode:     RunModeScaffolded,
+				Scaffold: Scaffold{Name: "retrieval-assisted"},
+				Passed:   true,
+			},
+		},
+	)
+
+	if report.Scaffolded.PassedTasks != 1 {
+		t.Fatalf("Scaffolded.PassedTasks = %d, want 1", report.Scaffolded.PassedTasks)
+	}
+
+	if report.Scaffolded.SuccessRate != 1 {
+		t.Fatalf("Scaffolded.SuccessRate = %v, want 1", report.Scaffolded.SuccessRate)
+	}
+
+	if report.Lift != 1 {
+		t.Fatalf("Lift = %v, want 1", report.Lift)
+	}
+}
+
 func TestBenchmarkServiceRunReturnsErrorWhenContextCanceledBeforeWorkBegins(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
