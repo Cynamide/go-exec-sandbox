@@ -1,6 +1,7 @@
 package sandbox
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/stdcopy"
 )
 
 var (
@@ -74,6 +76,18 @@ func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
 }
 
+func readAttachedOutput(reader io.Reader) (string, string, error) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	_, err := stdcopy.StdCopy(&stdout, &stderr, reader)
+	if err != nil {
+		return "", "", err
+	}
+
+	return stdout.String(), stderr.String(), nil
+}
+
 func RunCodeInSandbox(req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -88,15 +102,24 @@ func RunCodeInSandbox(req api.ExecutionRequest, cfg config.Config) (api.Executio
 	extension := getExtension(req.Language, cfg)
 	filePath := "/tmp/main" + extension
 
-	pull, err := cli.ImagePull(context.Background(), imageName, image.PullOptions{})
-	if err != nil {
-		return api.ExecutionResponse{}, fmt.Errorf("failed to pull image: %w", err)
-	}
-	io.Copy(io.Discard, pull)
-	pull.Close()
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(req.TimeoutMS)*time.Millisecond)
 	defer cancel()
+
+	pull, err := cli.ImagePull(ctx, imageName, image.PullOptions{})
+	if err != nil {
+		if ctx.Err() != nil {
+			return api.ExecutionResponse{}, fmt.Errorf("execution timed out")
+		}
+		return api.ExecutionResponse{}, fmt.Errorf("failed to pull image: %w", err)
+	}
+	defer pull.Close()
+
+	if _, err := io.Copy(io.Discard, pull); err != nil {
+		if ctx.Err() != nil {
+			return api.ExecutionResponse{}, fmt.Errorf("execution timed out")
+		}
+		return api.ExecutionResponse{}, fmt.Errorf("failed to read image pull output: %w", err)
+	}
 
 	execCmd := getCommand(req.Language, filePath, cfg)
 	sourceCmd := fmt.Sprintf("printf %%s %s > %s", shellQuote(req.SourceCode), shellQuote(filePath))
@@ -155,7 +178,7 @@ func RunCodeInSandbox(req api.ExecutionRequest, cfg config.Config) (api.Executio
 	case <-statusCh:
 	}
 
-	output, err := io.ReadAll(attachResp.Reader)
+	stdout, stderr, err := readAttachedOutput(attachResp.Reader)
 	if err != nil {
 		return api.ExecutionResponse{}, fmt.Errorf("failed to read container output: %w", err)
 	}
@@ -166,8 +189,8 @@ func RunCodeInSandbox(req api.ExecutionRequest, cfg config.Config) (api.Executio
 	}
 
 	return api.ExecutionResponse{
-		Stdout:   string(output),
-		Stderr:   "",
+		Stdout:   stdout,
+		Stderr:   stderr,
 		ExitCode: inspect.State.ExitCode,
 		Error:    "",
 	}, nil
