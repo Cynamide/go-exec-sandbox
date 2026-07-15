@@ -1,5 +1,5 @@
-# LocalEval: Secure Code Execution Sandbox & LLM Evaluation Harness
-A secure code execution service and LLM evaluation harness that runs user-submitted or AI-generated code in isolated Docker containers. Perfect for online code editors, interview platforms, or educational tools.
+# LocalEval: Secure Code Execution Sandbox & Benchmark Harness
+A secure code execution service and benchmark harness for economically meaningful, real-world agent tasks. It runs user-submitted or AI-generated code in isolated Docker containers and is designed to evaluate deliverables, workflows, and tool-using behavior rather than puzzle solving.
 
 ## Features
 
@@ -308,7 +308,7 @@ gexec-sandbox/
 │   └── evaluator/
 │       └── main.go          # HTTP server, LLM integration, graceful shutdown, and handlers
 ├── data/
-│   └── problems.json        # Benchmark problem dataset
+│   └── problems.json        # Benchmark task dataset
 ├── internal/
 │   ├── api/
 │   │   └── types.go         # Request/response types
@@ -398,11 +398,11 @@ curl -X POST http://localhost:8080/execute \
 
 ## Project Roadmap
 
-This project is being developed as a complete LLM benchmarking engine. Here's the current status based on the project goals:
+This project is being developed as a benchmark harness for economically meaningful, real-world tasks. Here's the current status based on the project goals:
 
 ### ✅ Completed Features
 
-- **Local LLM Evaluation Harness**
+- **Benchmark Harness**
   - ✅ Architected Go-based evaluation system orchestrating local inference (Ollama)
   - ✅ Docker Compose orchestration for Ollama and evaluator services
   - ✅ Environment-based configuration for model selection and host settings
@@ -433,19 +433,19 @@ This project is being developed as a complete LLM benchmarking engine. Here's th
 - **Benchmarking Pipeline**
   - ✅ Benchmark harness infrastructure (internal/benchmark/)
   - ✅ Problem dataset structure (data/problems.json)
-  - 🚧 Integration of LLM code generation with execution
-  - 🚧 Dataset management system for problems and test cases
+  - ✅ Integration of LLM code generation with execution
+  - ✅ Dataset management system for tasks and test cases
 
 - **Evaluation Metrics**
-  - 🚧 Pass@k metric calculation (k=1, k=5, k=10)
+  - ✅ Pass@k metric calculation (k=1, k=5, k=10)
   - 🚧 Statistical analysis and reporting
   - 🚧 Performance benchmarking across multiple models
 
-- **LeetCode-Style Challenges**
-  - 🚧 Dataset of programming problems with test cases
-  - 🚧 Problem parser and test case runner
-  - 🚧 Validation against reference solutions
-  - 🚧 Support for multiple problem categories and difficulty levels
+- **Benchmark Scope**
+  - ✅ Code execution and validation against expected outputs
+  - ✅ Support for stdin-driven workflows
+  - ✅ Support for software-engineering-style issue resolution
+  - 🚧 Expansion to other economically valuable workflows such as office, spreadsheet, web, and computer-use tasks
 
 - **Enhanced Features**
   - 🚧 Batch evaluation mode for comparing multiple models
