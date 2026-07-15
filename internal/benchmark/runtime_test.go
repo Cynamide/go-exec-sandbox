@@ -100,6 +100,15 @@ func TestRunTaskWithGraderUsesInjectedGrader(t *testing.T) {
 	}
 }
 
+func TestDefaultGraderMarksMatchingStdoutAsPass(t *testing.T) {
+	grader := DefaultGrader{}
+	outcome := grader.Grade(Task{}, api.ExecutionResponse{Stdout: "hello\n"}, TestCase{ExpectedOutput: "hello"})
+
+	if !outcome.Passed {
+		t.Fatalf("Outcome.Passed = false, want true")
+	}
+}
+
 func TestCodeExecutionAdapterDelegatesToSandbox(t *testing.T) {
 	adapter := CodeExecutionAdapter{
 		Runner: func(req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {
