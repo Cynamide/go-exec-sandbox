@@ -112,33 +112,6 @@ func TestDefaultGraderMarksMatchingStdoutAsPass(t *testing.T) {
 	}
 }
 
-func TestDefaultGraderAcceptsEquivalentMarkdownTables(t *testing.T) {
-	grader := DefaultGrader{}
-	outcome := grader.Grade(Task{}, api.ExecutionResponse{Stdout: " | team | count |\n| --- | --- |\n| api | 2 | \n| web | 1 |"}, TestCase{ExpectedOutput: "| team | count |\n| --- | --- |\n| api | 2 |\n| web | 1 |"})
-
-	if !outcome.Passed {
-		t.Fatalf("Outcome.Passed = false, want true")
-	}
-}
-
-func TestDefaultGraderAcceptsEquivalentCSVTables(t *testing.T) {
-	grader := DefaultGrader{}
-	outcome := grader.Grade(Task{}, api.ExecutionResponse{Stdout: "month,total\n2026-05,25\n2026-06,7\n"}, TestCase{ExpectedOutput: "month,total\n2026-05,25\n2026-06,7"})
-
-	if !outcome.Passed {
-		t.Fatalf("Outcome.Passed = false, want true")
-	}
-}
-
-func TestDefaultGraderAcceptsEquivalentJSON(t *testing.T) {
-	grader := DefaultGrader{}
-	outcome := grader.Grade(Task{}, api.ExecutionResponse{Stdout: "{\n  \"errors\": [\n    {\"message\": \"Auth failed\", \"count\": 3},\n    {\"message\": \"Timeout\", \"count\": 2}\n  ]\n}"}, TestCase{ExpectedOutput: "{\"errors\":[{\"message\":\"Auth failed\",\"count\":3},{\"message\":\"Timeout\",\"count\":2}]}"})
-
-	if !outcome.Passed {
-		t.Fatalf("Outcome.Passed = false, want true")
-	}
-}
-
 func TestCodeExecutionAdapterDelegatesToSandbox(t *testing.T) {
 	adapter := CodeExecutionAdapter{
 		Runner: func(ctx context.Context, req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {

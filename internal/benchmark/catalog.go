@@ -1,9 +1,13 @@
 package benchmark
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 )
+
+var ErrInvalidTaskCatalog = errors.New("invalid task catalog")
 
 type TaskCatalog struct {
 	Tasks []Task `json:"tasks"`
@@ -20,8 +24,16 @@ func LoadTaskCatalog(path string) (TaskCatalog, error) {
 	}
 
 	var catalog TaskCatalog
-	if err := json.Unmarshal(raw, &catalog); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&catalog); err != nil {
 		return TaskCatalog{}, err
+	}
+
+	for _, task := range catalog.Tasks {
+		if err := validateTask(task); err != nil {
+			return TaskCatalog{}, err
+		}
 	}
 
 	return catalog, nil
@@ -34,7 +46,9 @@ func LoadScaffoldCatalog(path string) (ScaffoldCatalog, error) {
 	}
 
 	var catalog ScaffoldCatalog
-	if err := json.Unmarshal(raw, &catalog); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&catalog); err != nil {
 		return ScaffoldCatalog{}, err
 	}
 
@@ -59,4 +73,27 @@ func (c ScaffoldCatalog) FilterByName(name string) ScaffoldCatalog {
 		}
 	}
 	return filtered
+}
+
+func validateTask(task Task) error {
+	if task.ID == "" {
+		return ErrInvalidTaskCatalog
+	}
+	if task.Title == "" {
+		return ErrInvalidTaskCatalog
+	}
+	if task.Description == "" {
+		return ErrInvalidTaskCatalog
+	}
+	if task.TaskFamily == "" {
+		return ErrInvalidTaskCatalog
+	}
+	if task.Language == "" {
+		return ErrInvalidTaskCatalog
+	}
+	if len(task.TestCases) == 0 {
+		return ErrInvalidTaskCatalog
+	}
+
+	return nil
 }

@@ -1,6 +1,10 @@
 package benchmark
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestLoadTaskCatalogReturnsFamilies(t *testing.T) {
 	catalog, err := LoadTaskCatalog("../../data/tasks.json")
@@ -56,6 +60,28 @@ func TestTaskCatalogContainsMultipleTaskFamilies(t *testing.T) {
 
 	if len(families) < 5 {
 		t.Fatalf("families = %v, want at least 5", families)
+	}
+}
+
+func TestLoadTaskCatalogRejectsTaskWithoutTestCases(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tasks.json")
+	if err := os.WriteFile(path, []byte(`{"tasks":[{"id":"artifact-task","title":"Artifact Task","description":"desc","task_family":"customer_support","language":"python"}]}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	if _, err := LoadTaskCatalog(path); err == nil {
+		t.Fatal("LoadTaskCatalog() error = nil, want invalid task catalog error")
+	}
+}
+
+func TestLoadTaskCatalogRejectsUnknownFields(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tasks.json")
+	if err := os.WriteFile(path, []byte(`{"tasks":[{"id":"task-1","title":"Task 1","description":"desc","task_family":"customer_support","language":"python","test_cases":[{"input":"","expected_output":"ok"}],"artifact_expectation":{"type":"markdown_report"}}]}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	if _, err := LoadTaskCatalog(path); err == nil {
+		t.Fatal("LoadTaskCatalog() error = nil, want unknown field error")
 	}
 }
 
