@@ -42,6 +42,7 @@ func TestTaskCatalogContainsMultipleTaskFamilies(t *testing.T) {
 	}
 
 	families := map[string]bool{}
+	hasArtifactExpectation := false
 	for _, task := range catalog.Tasks {
 		if task.TaskFamily == "" {
 			t.Fatalf("task %q missing task family", task.ID)
@@ -55,11 +56,27 @@ func TestTaskCatalogContainsMultipleTaskFamilies(t *testing.T) {
 		if len(task.TestCases) == 0 {
 			t.Fatalf("task %q missing test cases", task.ID)
 		}
+		if task.ArtifactExpectation != nil {
+			hasArtifactExpectation = true
+			if task.ArtifactExpectation.Type == "" {
+				t.Fatalf("task %q missing artifact type", task.ID)
+			}
+			if task.ArtifactExpectation.Format == "" {
+				t.Fatalf("task %q missing artifact format", task.ID)
+			}
+			if task.ArtifactExpectation.Description == "" {
+				t.Fatalf("task %q missing artifact description", task.ID)
+			}
+		}
 		families[task.TaskFamily] = true
 	}
 
 	if len(families) < 5 {
 		t.Fatalf("families = %v, want at least 5", families)
+	}
+
+	if !hasArtifactExpectation {
+		t.Fatalf("catalog.Tasks does not contain any artifact expectations")
 	}
 }
 
@@ -76,12 +93,23 @@ func TestLoadTaskCatalogRejectsTaskWithoutTestCases(t *testing.T) {
 
 func TestLoadTaskCatalogRejectsUnknownFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tasks.json")
-	if err := os.WriteFile(path, []byte(`{"tasks":[{"id":"task-1","title":"Task 1","description":"desc","task_family":"customer_support","language":"python","test_cases":[{"input":"","expected_output":"ok"}],"artifact_expectation":{"type":"markdown_report"}}]}`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"tasks":[{"id":"task-1","title":"Task 1","description":"desc","task_family":"customer_support","language":"python","test_cases":[{"input":"","expected_output":"ok"}],"unexpected":"boom"}]}`), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
 	if _, err := LoadTaskCatalog(path); err == nil {
 		t.Fatal("LoadTaskCatalog() error = nil, want unknown field error")
+	}
+}
+
+func TestLoadTaskCatalogRejectsDuplicateTaskIDs(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tasks.json")
+	if err := os.WriteFile(path, []byte(`{"tasks":[{"id":"task-1","title":"Task 1","description":"desc","task_family":"customer_support","language":"python","test_cases":[{"input":"","expected_output":"ok"}]},{"id":"task-1","title":"Task 2","description":"desc","task_family":"customer_support","language":"python","test_cases":[{"input":"","expected_output":"ok"}]}]}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	if _, err := LoadTaskCatalog(path); err == nil {
+		t.Fatal("LoadTaskCatalog() error = nil, want duplicate task ID error")
 	}
 }
 
@@ -115,6 +143,17 @@ func TestLoadScaffoldCatalogReturnsScaffolds(t *testing.T) {
 		if scaffold.Name == "baseline" && !scaffold.Baseline {
 			t.Fatalf("baseline scaffold has Baseline = false")
 		}
+	}
+}
+
+func TestLoadScaffoldCatalogRejectsDuplicateNamesOrBaselines(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "scaffolds.json")
+	if err := os.WriteFile(path, []byte(`{"scaffolds":[{"name":"baseline","baseline":true,"description":"baseline","prompt_prefix":""},{"name":"baseline","baseline":false,"description":"duplicate","prompt_prefix":"dup: "}]}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	if _, err := LoadScaffoldCatalog(path); err == nil {
+		t.Fatal("LoadScaffoldCatalog() error = nil, want duplicate scaffold name error")
 	}
 }
 

@@ -35,6 +35,13 @@ func LoadTaskCatalog(path string) (TaskCatalog, error) {
 			return TaskCatalog{}, err
 		}
 	}
+	seenIDs := make(map[string]struct{}, len(catalog.Tasks))
+	for _, task := range catalog.Tasks {
+		if _, ok := seenIDs[task.ID]; ok {
+			return TaskCatalog{}, ErrInvalidTaskCatalog
+		}
+		seenIDs[task.ID] = struct{}{}
+	}
 
 	return catalog, nil
 }
@@ -50,6 +57,24 @@ func LoadScaffoldCatalog(path string) (ScaffoldCatalog, error) {
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&catalog); err != nil {
 		return ScaffoldCatalog{}, err
+	}
+
+	seenNames := make(map[string]struct{}, len(catalog.Scaffolds))
+	baselineCount := 0
+	for _, scaffold := range catalog.Scaffolds {
+		if scaffold.Name == "" {
+			return ScaffoldCatalog{}, ErrInvalidTaskCatalog
+		}
+		if _, ok := seenNames[scaffold.Name]; ok {
+			return ScaffoldCatalog{}, ErrInvalidTaskCatalog
+		}
+		seenNames[scaffold.Name] = struct{}{}
+		if scaffold.Baseline {
+			baselineCount++
+		}
+	}
+	if baselineCount != 1 {
+		return ScaffoldCatalog{}, ErrInvalidTaskCatalog
 	}
 
 	return catalog, nil

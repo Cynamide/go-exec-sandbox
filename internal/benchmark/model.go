@@ -1,12 +1,19 @@
 package benchmark
 
+type ArtifactExpectation struct {
+	Type        string `json:"type"`
+	Format      string `json:"format,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
 type Task struct {
-	ID          string     `json:"id"`
-	Title       string     `json:"title"`
-	Description string     `json:"description"`
-	TaskFamily  string     `json:"task_family"`
-	Language    string     `json:"language"`
-	TestCases   []TestCase `json:"test_cases"`
+	ID                  string               `json:"id"`
+	Title               string               `json:"title"`
+	Description         string               `json:"description"`
+	TaskFamily          string               `json:"task_family"`
+	Language            string               `json:"language"`
+	ArtifactExpectation *ArtifactExpectation `json:"artifact_expectation,omitempty"`
+	TestCases           []TestCase           `json:"test_cases"`
 }
 
 type Scaffold struct {

@@ -3,17 +3,17 @@
     {
       "id": "release-note-digest",
       "title": "Generate A Release Notes Digest",
-      "description": "Read newline-delimited deployment notes from stdin in the format '<team>|<change type>|<summary>'. Produce a markdown table summarizing how many changes each team shipped, sorted alphabetically by team.",
+      "description": "Read newline-delimited deployment notes from stdin in the format '<team>|<change type>|<summary>'. Produce a markdown table summarizing how many feature and fix changes each team shipped, sorted alphabetically by team.",
       "task_family": "software_engineering",
       "language": "python",
       "test_cases": [
         {
           "input": "api|feature|Added audit logging\nweb|fix|Fixed checkout redirect\napi|fix|Patched token refresh\n",
-          "expected_output": "| team | changes |\n| --- | --- |\n| api | 2 |\n| web | 1 |"
+          "expected_output": "| team | feature changes | fix changes |\n| --- | --- | --- |\n| api | 1 | 1 |\n| web | 0 | 1 |"
         },
         {
           "input": "search|feature|Added filters\napi|fix|Patched token refresh\nsearch|fix|Reduced latency\n",
-          "expected_output": "| team | changes |\n| --- | --- |\n| api | 1 |\n| search | 2 |"
+          "expected_output": "| team | feature changes | fix changes |\n| --- | --- | --- |\n| api | 0 | 1 |\n| search | 1 | 1 |"
         }
       ]
     },
@@ -54,34 +54,39 @@
     {
       "id": "incident-owner-rollup",
       "title": "Roll Up Incident Ownership From Terminal Output",
-      "description": "Read newline-delimited incident records from stdin in the format '<owner> <status>'. Produce a short markdown incident report that lists only open incidents by owner, sorted alphabetically by owner.",
+      "description": "Read newline-delimited incident records from stdin in the format '<owner> <status>'. Produce a markdown incident report that counts open and closed incidents by owner, sorted alphabetically by owner.",
       "task_family": "operations",
       "language": "python",
       "test_cases": [
         {
           "input": "alex open\nsam closed\nalex open\nmira open\n",
-          "expected_output": "- alex: 2 open\n- mira: 1 open"
+          "expected_output": "| owner | open incidents | closed incidents |\n| --- | --- | --- |\n| alex | 2 | 0 |\n| mira | 1 | 0 |\n| sam | 0 | 1 |"
         },
         {
           "input": "alex open\nmira open\nalex closed\nzoe open\nmira open\nzoe closed\n",
-          "expected_output": "- alex: 1 open\n- mira: 2 open\n- zoe: 1 open"
+          "expected_output": "| owner | open incidents | closed incidents |\n| --- | --- | --- |\n| alex | 1 | 1 |\n| mira | 2 | 0 |\n| zoe | 1 | 1 |"
         }
       ]
     },
     {
       "id": "support-escalation-summary",
       "title": "Summarize Support Escalations Into Markdown",
-      "description": "Read newline-delimited support escalation records from stdin in the format '<priority>|<team>|<status>'. Produce a markdown report that counts open escalations by team, sorted alphabetically by team.",
+      "description": "Read newline-delimited support escalation records from stdin in the format '<priority>|<team>|<status>'. Produce a markdown report that counts open escalations by priority and team, sorted alphabetically by team.",
       "task_family": "customer_support",
       "language": "python",
+      "artifact_expectation": {
+        "type": "markdown_report",
+        "format": "markdown",
+        "description": "Markdown table with columns team, p1 open, p2 open, and p3 open escalations"
+      },
       "test_cases": [
         {
           "input": "p1|platform|open\np2|billing|closed\np1|billing|open\n",
-          "expected_output": "| team | open escalations |\n| --- | --- |\n| billing | 1 |\n| platform | 1 |"
+          "expected_output": "| team | p1 open | p2 open | p3 open |\n| --- | --- | --- | --- |\n| billing | 1 | 0 | 0 |\n| platform | 1 | 0 | 0 |"
         },
         {
           "input": "p3|ops|open\np2|ops|open\np3|success|closed\np1|ops|open\n",
-          "expected_output": "| team | open escalations |\n| --- | --- |\n| ops | 3 |"
+          "expected_output": "| team | p1 open | p2 open | p3 open |\n| --- | --- | --- | --- |\n| ops | 1 | 1 | 1 |\n| success | 0 | 0 | 0 |"
         }
       ]
     }
