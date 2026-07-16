@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 )
 
@@ -27,6 +28,9 @@ func LoadTaskCatalog(path string) (TaskCatalog, error) {
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&catalog); err != nil {
+		return TaskCatalog{}, err
+	}
+	if err := requireEOF(decoder); err != nil {
 		return TaskCatalog{}, err
 	}
 
@@ -56,6 +60,9 @@ func LoadScaffoldCatalog(path string) (ScaffoldCatalog, error) {
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&catalog); err != nil {
+		return ScaffoldCatalog{}, err
+	}
+	if err := requireEOF(decoder); err != nil {
 		return ScaffoldCatalog{}, err
 	}
 
@@ -117,6 +124,20 @@ func validateTask(task Task) error {
 		return ErrInvalidTaskCatalog
 	}
 	if len(task.TestCases) == 0 {
+		return ErrInvalidTaskCatalog
+	}
+	if task.ArtifactExpectation != nil {
+		if task.ArtifactExpectation.Type == "" || task.ArtifactExpectation.Format == "" || task.ArtifactExpectation.Description == "" {
+			return ErrInvalidTaskCatalog
+		}
+	}
+
+	return nil
+}
+
+func requireEOF(decoder *json.Decoder) error {
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
 		return ErrInvalidTaskCatalog
 	}
 

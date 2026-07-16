@@ -113,6 +113,28 @@ func TestLoadTaskCatalogRejectsDuplicateTaskIDs(t *testing.T) {
 	}
 }
 
+func TestLoadTaskCatalogRejectsMalformedArtifactMetadata(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tasks.json")
+	if err := os.WriteFile(path, []byte(`{"tasks":[{"id":"task-1","title":"Task 1","description":"desc","task_family":"customer_support","language":"python","artifact_expectation":{"type":"markdown_report","format":"markdown"},"test_cases":[{"input":"","expected_output":"ok"}]}]}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	if _, err := LoadTaskCatalog(path); err == nil {
+		t.Fatal("LoadTaskCatalog() error = nil, want malformed artifact metadata error")
+	}
+}
+
+func TestLoadTaskCatalogRejectsTrailingJSON(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tasks.json")
+	if err := os.WriteFile(path, []byte(`{"tasks":[{"id":"task-1","title":"Task 1","description":"desc","task_family":"customer_support","language":"python","test_cases":[{"input":"","expected_output":"ok"}]}]} {"unexpected":true}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	if _, err := LoadTaskCatalog(path); err == nil {
+		t.Fatal("LoadTaskCatalog() error = nil, want trailing JSON error")
+	}
+}
+
 func TestLoadScaffoldCatalogReturnsScaffolds(t *testing.T) {
 	catalog, err := LoadScaffoldCatalog("../../data/scaffolds.json")
 	if err != nil {
