@@ -54,6 +54,9 @@ func (s BenchmarkService) Run(ctx context.Context) (BenchmarkReport, error) {
 	if len(scaffoldVariants) == 0 {
 		return BenchmarkReport{}, fmt.Errorf("need at least one scaffolded scaffold")
 	}
+	if len(s.Tasks.Tasks) == 0 {
+		return BenchmarkReport{}, fmt.Errorf("at least one task is required")
+	}
 
 	grader := s.Grader
 	if grader == nil {

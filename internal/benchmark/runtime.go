@@ -49,7 +49,22 @@ func RunTaskWithGrader(ctx context.Context, task Task, scaffold Scaffold, mode R
 		TimeoutMS:  cfg.DefaultTimeoutMS,
 	}
 
-	outcomes := make([]Outcome, 0, len(task.TestCases))
+	testCases := task.TestCases
+	if len(testCases) == 0 {
+		if task.ArtifactExpectation == nil || task.ArtifactExpectation.ExpectedOutput == "" {
+			return Run{
+				TaskID:   task.ID,
+				Mode:     mode,
+				Scaffold: scaffold,
+				Error:    "task requires test cases or artifact expectation",
+			}
+		}
+		testCases = []TestCase{{
+			ExpectedOutput: task.ArtifactExpectation.ExpectedOutput,
+		}}
+	}
+
+	outcomes := make([]Outcome, 0, len(testCases))
 	run := Run{
 		TaskID:   task.ID,
 		Mode:     mode,
@@ -57,7 +72,7 @@ func RunTaskWithGrader(ctx context.Context, task Task, scaffold Scaffold, mode R
 		Passed:   true,
 	}
 
-	for _, tc := range task.TestCases {
+	for _, tc := range testCases {
 		if err := ctx.Err(); err != nil {
 			run.Passed = false
 			run.Error = err.Error()

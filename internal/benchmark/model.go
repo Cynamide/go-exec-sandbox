@@ -1,9 +1,10 @@
 package benchmark
 
 type ArtifactExpectation struct {
-	Type        string `json:"type"`
-	Format      string `json:"format,omitempty"`
-	Description string `json:"description,omitempty"`
+	Type           string `json:"type"`
+	Format         string `json:"format,omitempty"`
+	Description    string `json:"description,omitempty"`
+	ExpectedOutput string `json:"expected_output,omitempty"`
 }
 
 type Task struct {

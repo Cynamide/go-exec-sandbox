@@ -112,6 +112,86 @@ func TestDefaultGraderMarksMatchingStdoutAsPass(t *testing.T) {
 	}
 }
 
+func TestDefaultGraderUsesMarkdownArtifactFormat(t *testing.T) {
+	grader := DefaultGrader{}
+	task := Task{
+		ArtifactExpectation: &ArtifactExpectation{Format: "markdown"},
+	}
+	outcome := grader.Grade(task, api.ExecutionResponse{Stdout: "team | count\n--- | ---\napi | 2\nweb | 1"}, TestCase{ExpectedOutput: "team | count\n--- | ---\napi | 2\nweb | 1"})
+
+	if !outcome.Passed {
+		t.Fatalf("Outcome.Passed = false, want true")
+	}
+}
+
+func TestDefaultGraderUsesCSVArtifactFormat(t *testing.T) {
+	grader := DefaultGrader{}
+	task := Task{
+		ArtifactExpectation: &ArtifactExpectation{Format: "csv"},
+	}
+	outcome := grader.Grade(task, api.ExecutionResponse{Stdout: "month,total\n2026-05,25\n2026-06,7"}, TestCase{ExpectedOutput: "month,total\n2026-05,25\n2026-06,7"})
+
+	if !outcome.Passed {
+		t.Fatalf("Outcome.Passed = false, want true")
+	}
+}
+
+func TestDefaultGraderUsesJSONArtifactFormat(t *testing.T) {
+	grader := DefaultGrader{}
+	task := Task{
+		ArtifactExpectation: &ArtifactExpectation{Format: "json"},
+	}
+	outcome := grader.Grade(task, api.ExecutionResponse{Stdout: "{\n  \"errors\": [\n    {\"message\": \"Auth failed\", \"count\": 3},\n    {\"message\": \"Timeout\", \"count\": 2}\n  ]\n}"}, TestCase{ExpectedOutput: "{\"errors\":[{\"message\":\"Auth failed\",\"count\":3},{\"message\":\"Timeout\",\"count\":2}]}"})
+
+	if !outcome.Passed {
+		t.Fatalf("Outcome.Passed = false, want true")
+	}
+}
+
+func TestRunTaskWithArtifactExpectationUsesSyntheticCase(t *testing.T) {
+	exec := fakeExecutor{
+		resp: api.ExecutionResponse{Stdout: "| team | open |\n| --- | --- |\n| billing | 1 |"},
+	}
+
+	client := &fakeLLMClient{
+		code: "```python\nprint('| team | open |\\n| --- | --- |\\n| billing | 1 |')\n```",
+	}
+
+	task := Task{
+		ID:          "artifact-task",
+		Description: "solve this",
+		Language:    "python",
+		ArtifactExpectation: &ArtifactExpectation{
+			Type:           "markdown_report",
+			Format:         "markdown",
+			Description:    "Markdown table",
+			ExpectedOutput: "| team | open |\n| --- | --- |\n| billing | 1 |",
+		},
+	}
+
+	run := RunTask(
+		context.Background(),
+		task,
+		Scaffold{Name: "tool-assisted", PromptPrefix: "tool-assisted: "},
+		RunModeBaseline,
+		client,
+		exec,
+		config.Config{DefaultTimeoutMS: 1234},
+	)
+
+	if !run.Passed {
+		t.Fatalf("Passed = %v, want true", run.Passed)
+	}
+
+	if len(run.Outcomes) != 1 {
+		t.Fatalf("len(Outcomes) = %d, want 1", len(run.Outcomes))
+	}
+
+	if client.seenPrompt != "solve this" {
+		t.Fatalf("seenPrompt = %q, want %q", client.seenPrompt, "solve this")
+	}
+}
+
 func TestCodeExecutionAdapterDelegatesToSandbox(t *testing.T) {
 	adapter := CodeExecutionAdapter{
 		Runner: func(ctx context.Context, req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {

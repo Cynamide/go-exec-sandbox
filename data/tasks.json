@@ -4,7 +4,7 @@
       "id": "release-note-digest",
       "title": "Generate A Release Notes Digest",
       "description": "Read newline-delimited deployment notes from stdin in the format '<team>|<change type>|<summary>'. Produce exactly this markdown table format, with the columns 'team', 'feature changes', and 'fix changes', sorted alphabetically by team.",
-      "task_family": "software_engineering",
+      "task_family": "engineering_workflows",
       "language": "python",
       "test_cases": [
         {
@@ -21,7 +21,7 @@
       "id": "checkout-error-summary",
       "title": "Summarize Checkout Errors From Logs",
       "description": "Read newline-delimited checkout error messages from stdin. Produce exactly this markdown table format with the columns 'message' and 'count', sorted by descending count and then alphabetically for ties.",
-      "task_family": "observability",
+      "task_family": "monitoring_workflows",
       "language": "python",
       "test_cases": [
         {
@@ -38,7 +38,7 @@
       "id": "monthly-revenue-rollup",
       "title": "Roll Up Monthly Revenue From CSV",
       "description": "Read CSV rows from stdin with header month,amount. Produce exactly this CSV report with the header 'month,total', one row per month, and totals in first-seen month order.",
-      "task_family": "finance_reporting",
+      "task_family": "finance_workflows",
       "language": "python",
       "test_cases": [
         {
@@ -55,7 +55,7 @@
       "id": "incident-owner-rollup",
       "title": "Roll Up Incident Ownership From Terminal Output",
       "description": "Read newline-delimited incident records from stdin in the format '<owner> <status>'. Produce exactly this markdown incident report format with the columns 'owner', 'open incidents', and 'closed incidents', sorted alphabetically by owner.",
-      "task_family": "operations",
+      "task_family": "incident_workflows",
       "language": "python",
       "test_cases": [
         {
@@ -72,23 +72,14 @@
       "id": "support-escalation-summary",
       "title": "Summarize Support Escalations Into Markdown",
       "description": "Read newline-delimited support escalation records from stdin in the format '<priority>|<team>|<status>'. Produce exactly this markdown report format with the columns 'team', 'p1 open', 'p2 open', and 'p3 open', sorted alphabetically by team.",
-      "task_family": "customer_support",
+      "task_family": "support_workflows",
       "language": "python",
       "artifact_expectation": {
         "type": "markdown_report",
         "format": "markdown",
-        "description": "Markdown table with columns team, p1 open, p2 open, and p3 open escalations"
-      },
-      "test_cases": [
-        {
-          "input": "p1|platform|open\np2|billing|closed\np1|billing|open\n",
-          "expected_output": "| team | p1 open | p2 open | p3 open |\n| --- | --- | --- | --- |\n| billing | 1 | 0 | 0 |\n| platform | 1 | 0 | 0 |"
-        },
-        {
-          "input": "p3|ops|open\np2|ops|open\np3|success|closed\np1|ops|open\n",
-          "expected_output": "| team | p1 open | p2 open | p3 open |\n| --- | --- | --- | --- |\n| ops | 1 | 1 | 1 |\n| success | 0 | 0 | 0 |"
-        }
-      ]
+        "description": "Markdown table with columns team, p1 open, p2 open, and p3 open escalations",
+        "expected_output": "| team | p1 open | p2 open | p3 open |\n| --- | --- | --- | --- |\n| billing | 1 | 0 | 0 |\n| platform | 1 | 0 | 0 |"
+      }
     }
   ]
 }

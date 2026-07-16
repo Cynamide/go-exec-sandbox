@@ -22,11 +22,11 @@ func TestLoadTaskCatalogReturnsFamilies(t *testing.T) {
 	}
 
 	wantFamilies := []string{
-		"software_engineering",
-		"observability",
-		"finance_reporting",
-		"operations",
-		"customer_support",
+		"engineering_workflows",
+		"monitoring_workflows",
+		"finance_workflows",
+		"incident_workflows",
+		"support_workflows",
 	}
 	for _, family := range wantFamilies {
 		if _, ok := gotFamilies[family]; !ok {
@@ -53,9 +53,6 @@ func TestTaskCatalogContainsMultipleTaskFamilies(t *testing.T) {
 		if task.Description == "" {
 			t.Fatalf("task %q missing description", task.ID)
 		}
-		if len(task.TestCases) == 0 {
-			t.Fatalf("task %q missing test cases", task.ID)
-		}
 		if task.ArtifactExpectation != nil {
 			hasArtifactExpectation = true
 			if task.ArtifactExpectation.Type == "" {
@@ -67,6 +64,12 @@ func TestTaskCatalogContainsMultipleTaskFamilies(t *testing.T) {
 			if task.ArtifactExpectation.Description == "" {
 				t.Fatalf("task %q missing artifact description", task.ID)
 			}
+			if task.ArtifactExpectation.ExpectedOutput == "" {
+				t.Fatalf("task %q missing artifact expected output", task.ID)
+			}
+		}
+		if len(task.TestCases) == 0 && task.ArtifactExpectation == nil {
+			t.Fatalf("task %q missing test cases and artifact expectation", task.ID)
 		}
 		families[task.TaskFamily] = true
 	}
@@ -88,6 +91,22 @@ func TestLoadTaskCatalogRejectsTaskWithoutTestCases(t *testing.T) {
 
 	if _, err := LoadTaskCatalog(path); err == nil {
 		t.Fatal("LoadTaskCatalog() error = nil, want invalid task catalog error")
+	}
+}
+
+func TestLoadTaskCatalogAcceptsArtifactOnlyTask(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tasks.json")
+	if err := os.WriteFile(path, []byte(`{"tasks":[{"id":"artifact-task","title":"Artifact Task","description":"desc","task_family":"customer_support","language":"python","artifact_expectation":{"type":"markdown_report","format":"markdown","description":"artifact output","expected_output":"| team | open |\n| --- | --- |\n| billing | 1 |"}}]}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	catalog, err := LoadTaskCatalog(path)
+	if err != nil {
+		t.Fatalf("LoadTaskCatalog() error = %v", err)
+	}
+
+	if len(catalog.Tasks) != 1 || catalog.Tasks[0].ArtifactExpectation == nil {
+		t.Fatalf("catalog = %+v, want artifact-only task", catalog)
 	}
 }
 
@@ -182,12 +201,12 @@ func TestLoadScaffoldCatalogRejectsDuplicateNamesOrBaselines(t *testing.T) {
 func TestTaskCatalogFiltersByFamily(t *testing.T) {
 	catalog := TaskCatalog{
 		Tasks: []Task{
-			{ID: "a", TaskFamily: "software_engineering"},
-			{ID: "b", TaskFamily: "spreadsheets"},
+			{ID: "a", TaskFamily: "engineering_workflows"},
+			{ID: "b", TaskFamily: "finance_workflows"},
 		},
 	}
 
-	filtered := catalog.FilterByFamily("spreadsheets")
+	filtered := catalog.FilterByFamily("finance_workflows")
 	if len(filtered.Tasks) != 1 || filtered.Tasks[0].ID != "b" {
 		t.Fatalf("FilterByFamily() = %+v, want only task b", filtered.Tasks)
 	}
@@ -196,13 +215,13 @@ func TestTaskCatalogFiltersByFamily(t *testing.T) {
 func TestScaffoldCatalogFiltersByName(t *testing.T) {
 	catalog := ScaffoldCatalog{
 		Scaffolds: []Scaffold{
-			{Name: "baseline"},
+			{Baseline: true, Name: "baseline"},
 			{Name: "tool-assisted"},
 		},
 	}
 
 	filtered := catalog.FilterByName("tool-assisted")
-	if len(filtered.Scaffolds) != 1 || filtered.Scaffolds[0].Name != "tool-assisted" {
-		t.Fatalf("FilterByName() = %+v, want only scaffold tool-assisted", filtered.Scaffolds)
+	if len(filtered.Scaffolds) != 2 || filtered.Scaffolds[0].Name != "baseline" || filtered.Scaffolds[1].Name != "tool-assisted" {
+		t.Fatalf("FilterByName() = %+v, want baseline plus tool-assisted", filtered.Scaffolds)
 	}
 }

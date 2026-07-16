@@ -99,10 +99,18 @@ func (c TaskCatalog) FilterByFamily(family string) TaskCatalog {
 
 func (c ScaffoldCatalog) FilterByName(name string) ScaffoldCatalog {
 	filtered := ScaffoldCatalog{}
+	var baseline *Scaffold
 	for _, scaffold := range c.Scaffolds {
+		if scaffold.Baseline {
+			scaffoldCopy := scaffold
+			baseline = &scaffoldCopy
+		}
 		if scaffold.Name == name {
 			filtered.Scaffolds = append(filtered.Scaffolds, scaffold)
 		}
+	}
+	if baseline != nil && (name != baseline.Name || len(filtered.Scaffolds) == 0) {
+		filtered.Scaffolds = append([]Scaffold{*baseline}, filtered.Scaffolds...)
 	}
 	return filtered
 }
@@ -123,11 +131,11 @@ func validateTask(task Task) error {
 	if task.Language == "" {
 		return ErrInvalidTaskCatalog
 	}
-	if len(task.TestCases) == 0 {
+	if len(task.TestCases) == 0 && (task.ArtifactExpectation == nil || task.ArtifactExpectation.ExpectedOutput == "") {
 		return ErrInvalidTaskCatalog
 	}
 	if task.ArtifactExpectation != nil {
-		if task.ArtifactExpectation.Type == "" || task.ArtifactExpectation.Format == "" || task.ArtifactExpectation.Description == "" {
+		if task.ArtifactExpectation.Type == "" || task.ArtifactExpectation.Format == "" || task.ArtifactExpectation.Description == "" || task.ArtifactExpectation.ExpectedOutput == "" {
 			return ErrInvalidTaskCatalog
 		}
 	}
