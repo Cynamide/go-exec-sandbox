@@ -3,68 +3,68 @@
     {
       "id": "release-note-digest",
       "title": "Generate A Release Notes Digest",
-      "description": "Read newline-delimited deployment notes from stdin in the format '<team>|<change type>|<summary>'. Print one line per team as '<team>: <count> changes' sorted alphabetically by team.",
+      "description": "Read newline-delimited deployment notes from stdin in the format '<team>|<change type>|<summary>'. Produce a markdown table summarizing how many changes each team shipped, sorted alphabetically by team.",
       "task_family": "software_engineering",
       "language": "python",
       "test_cases": [
         {
           "input": "api|feature|Added audit logging\nweb|fix|Fixed checkout redirect\napi|fix|Patched token refresh\n",
-          "expected_output": "api: 2 changes\nweb: 1 changes"
+          "expected_output": "| team | changes |\n| api | 2 |\n| web | 1 |"
         },
         {
           "input": "search|feature|Added filters\napi|fix|Patched token refresh\nsearch|fix|Reduced latency\n",
-          "expected_output": "api: 1 changes\nsearch: 2 changes"
+          "expected_output": "| team | changes |\n| api | 1 |\n| search | 2 |"
         }
       ]
     },
     {
       "id": "checkout-error-summary",
       "title": "Summarize Checkout Errors From Browser Logs",
-      "description": "Read newline-delimited browser console errors from stdin. Print the distinct error messages with occurrence counts as '<message>: <count>' sorted by descending count, then alphabetically for ties.",
+      "description": "Read newline-delimited browser console errors from stdin. Produce a JSON report listing each distinct message with its count, sorted by descending count and then alphabetically for ties.",
       "task_family": "browser_workflows",
       "language": "python",
       "test_cases": [
         {
           "input": "Checkout failed\nNetwork timeout\nCheckout failed\n",
-          "expected_output": "Checkout failed: 2\nNetwork timeout: 1"
+          "expected_output": "{\"errors\":[{\"message\":\"Checkout failed\",\"count\":2},{\"message\":\"Network timeout\",\"count\":1}]}"
         },
         {
           "input": "Timeout\nTimeout\nAuth failed\nAuth failed\nAuth failed\n",
-          "expected_output": "Auth failed: 3\nTimeout: 2"
+          "expected_output": "{\"errors\":[{\"message\":\"Auth failed\",\"count\":3},{\"message\":\"Timeout\",\"count\":2}]}"
         }
       ]
     },
     {
       "id": "monthly-revenue-rollup",
       "title": "Roll Up Monthly Revenue From CSV",
-      "description": "Read CSV rows from stdin with header month,amount. Print one line per month as '<month>,<total>' preserving the first-seen month order.",
+      "description": "Read CSV rows from stdin with header month,amount. Produce a compact CSV report with one row per month and the total revenue for that month, preserving the first-seen month order.",
       "task_family": "spreadsheets",
       "language": "python",
       "test_cases": [
         {
           "input": "month,amount\n2026-05,10\n2026-05,15\n2026-06,7\n",
-          "expected_output": "2026-05,25\n2026-06,7"
+          "expected_output": "month,total\n2026-05,25\n2026-06,7"
         },
         {
           "input": "month,amount\n2026-04,5\n2026-03,8\n2026-04,2\n2026-05,1\n2026-03,7\n",
-          "expected_output": "2026-04,7\n2026-03,15\n2026-05,1"
+          "expected_output": "month,total\n2026-04,7\n2026-03,15\n2026-05,1"
         }
       ]
     },
     {
       "id": "incident-owner-rollup",
       "title": "Roll Up Incident Ownership From Terminal Output",
-      "description": "Read newline-delimited incident records from stdin in the format '<owner> <status>'. Count only records whose status is 'open' and print '<owner> <count>' sorted alphabetically by owner.",
+      "description": "Read newline-delimited incident records from stdin in the format '<owner> <status>'. Produce a short markdown incident report that lists only open incidents by owner, sorted alphabetically by owner.",
       "task_family": "terminal_workflows",
       "language": "python",
       "test_cases": [
         {
           "input": "alex open\nsam closed\nalex open\nmira open\n",
-          "expected_output": "alex 2\nmira 1"
+          "expected_output": "- alex: 2 open\n- mira: 1 open"
         },
         {
           "input": "alex open\nmira open\nalex closed\nzoe open\nmira open\nzoe closed\n",
-          "expected_output": "alex 1\nmira 2\nzoe 1"
+          "expected_output": "- alex: 1 open\n- mira: 2 open\n- zoe: 1 open"
         }
       ]
     }

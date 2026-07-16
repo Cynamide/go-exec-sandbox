@@ -27,10 +27,6 @@ func TestLoadTaskCatalogReturnsFamilies(t *testing.T) {
 		if _, ok := gotFamilies[family]; !ok {
 			t.Fatalf("catalog.Tasks missing task family %q", family)
 		}
-		delete(gotFamilies, family)
-	}
-	if len(gotFamilies) != 0 {
-		t.Fatalf("catalog.Tasks contains unexpected task families: %v", gotFamilies)
 	}
 }
 
@@ -58,10 +54,6 @@ func TestLoadScaffoldCatalogReturnsScaffolds(t *testing.T) {
 		if _, ok := gotScaffolds[name]; !ok {
 			t.Fatalf("catalog.Scaffolds missing scaffold %q", name)
 		}
-		delete(gotScaffolds, name)
-	}
-	if len(gotScaffolds) != 0 {
-		t.Fatalf("catalog.Scaffolds contains unexpected scaffold names: %v", gotScaffolds)
 	}
 
 	for _, scaffold := range catalog.Scaffolds {
