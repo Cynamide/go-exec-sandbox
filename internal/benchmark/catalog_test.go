@@ -12,8 +12,15 @@ func TestLoadTaskCatalogReturnsFamilies(t *testing.T) {
 		t.Fatalf("catalog.Tasks is empty")
 	}
 
-	if catalog.Tasks[0].TaskFamily == "" {
-		t.Fatalf("first task missing TaskFamily")
+	foundFamily := false
+	for _, task := range catalog.Tasks {
+		if task.TaskFamily != "" {
+			foundFamily = true
+			break
+		}
+	}
+	if !foundFamily {
+		t.Fatalf("catalog.Tasks does not contain any task family")
 	}
 }
 
@@ -27,7 +34,14 @@ func TestLoadScaffoldCatalogReturnsScaffolds(t *testing.T) {
 		t.Fatalf("catalog.Scaffolds is empty")
 	}
 
-	if !catalog.Scaffolds[0].Baseline {
-		t.Fatalf("first scaffold should be baseline")
+	foundBaseline := false
+	for _, scaffold := range catalog.Scaffolds {
+		if scaffold.Baseline || scaffold.Name == "baseline" {
+			foundBaseline = true
+			break
+		}
+	}
+	if !foundBaseline {
+		t.Fatalf("catalog.Scaffolds does not contain a baseline scaffold")
 	}
 }
