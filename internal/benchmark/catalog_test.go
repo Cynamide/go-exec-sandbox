@@ -41,8 +41,12 @@ func TestTaskCatalogContainsMultipleTaskFamilies(t *testing.T) {
 		families[task.TaskFamily] = true
 	}
 
-	if len(families) < 4 {
-		t.Fatalf("families = %v, want at least 4", families)
+	if len(families) < 5 {
+		t.Fatalf("families = %v, want at least 5", families)
+	}
+
+	if !families["customer_support"] {
+		t.Fatalf("families = %v, want customer_support", families)
 	}
 }
 
