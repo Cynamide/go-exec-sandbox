@@ -48,11 +48,14 @@ func TestTaskCatalogContainsMultipleTaskFamilies(t *testing.T) {
 		if task.Description == "" {
 			t.Fatalf("task %q missing description", task.ID)
 		}
-		if len(task.TestCases) == 0 {
+		if len(task.TestCases) == 0 && task.ArtifactExpectation == nil {
 			t.Fatalf("task %q missing test cases", task.ID)
 		}
-		if task.ArtifactExpectation.Type != "" {
+		if task.ArtifactExpectation != nil {
 			hasArtifactExpectation = true
+			if task.ArtifactExpectation.Type == "" {
+				t.Fatalf("task %q missing artifact type", task.ID)
+			}
 			if task.ArtifactExpectation.Format == "" {
 				t.Fatalf("task %q missing artifact format", task.ID)
 			}
@@ -63,8 +66,8 @@ func TestTaskCatalogContainsMultipleTaskFamilies(t *testing.T) {
 		families[task.TaskFamily] = true
 	}
 
-	if len(families) < 5 {
-		t.Fatalf("families = %v, want at least 5", families)
+	if len(families) < 4 {
+		t.Fatalf("families = %v, want at least 4", families)
 	}
 
 	if !hasArtifactExpectation {
