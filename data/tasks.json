@@ -81,12 +81,12 @@
       },
       "test_cases": [
         {
-          "input": "p1|billing|open\np2|billing|closed\np1|platform|open\n",
-          "expected_output": "| team | open escalations |\n| billing | 1 |\n| platform | 1 |"
+          "input": "p1|platform|open\np2|billing|closed\np1|billing|open\n",
+          "expected_output": "| team | open escalations |\n| --- | --- |\n| billing | 1 |\n| platform | 1 |"
         },
         {
           "input": "p3|ops|open\np2|ops|open\np3|success|closed\np1|ops|open\n",
-          "expected_output": "| team | open escalations |\n| ops | 3 |"
+          "expected_output": "| team | open escalations |\n| --- | --- |\n| ops | 3 |"
         }
       ]
     }
