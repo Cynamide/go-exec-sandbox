@@ -30,6 +30,22 @@ func TestLoadTaskCatalogReturnsFamilies(t *testing.T) {
 	}
 }
 
+func TestTaskCatalogContainsMultipleTaskFamilies(t *testing.T) {
+	catalog, err := LoadTaskCatalog("../../data/tasks.json")
+	if err != nil {
+		t.Fatalf("LoadTaskCatalog() error = %v", err)
+	}
+
+	families := map[string]bool{}
+	for _, task := range catalog.Tasks {
+		families[task.TaskFamily] = true
+	}
+
+	if len(families) < 4 {
+		t.Fatalf("families = %v, want at least 4", families)
+	}
+}
+
 func TestLoadScaffoldCatalogReturnsScaffolds(t *testing.T) {
 	catalog, err := LoadScaffoldCatalog("../../data/scaffolds.json")
 	if err != nil {
