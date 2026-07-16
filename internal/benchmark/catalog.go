@@ -40,3 +40,23 @@ func LoadScaffoldCatalog(path string) (ScaffoldCatalog, error) {
 
 	return catalog, nil
 }
+
+func (c TaskCatalog) FilterByFamily(family string) TaskCatalog {
+	filtered := TaskCatalog{}
+	for _, task := range c.Tasks {
+		if task.TaskFamily == family {
+			filtered.Tasks = append(filtered.Tasks, task)
+		}
+	}
+	return filtered
+}
+
+func (c ScaffoldCatalog) FilterByName(name string) ScaffoldCatalog {
+	filtered := ScaffoldCatalog{}
+	for _, scaffold := range c.Scaffolds {
+		if scaffold.Name == name {
+			filtered.Scaffolds = append(filtered.Scaffolds, scaffold)
+		}
+	}
+	return filtered
+}

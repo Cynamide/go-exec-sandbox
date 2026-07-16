@@ -62,3 +62,31 @@ func TestLoadScaffoldCatalogReturnsScaffolds(t *testing.T) {
 		}
 	}
 }
+
+func TestTaskCatalogFiltersByFamily(t *testing.T) {
+	catalog := TaskCatalog{
+		Tasks: []Task{
+			{ID: "a", TaskFamily: "software_engineering"},
+			{ID: "b", TaskFamily: "spreadsheets"},
+		},
+	}
+
+	filtered := catalog.FilterByFamily("spreadsheets")
+	if len(filtered.Tasks) != 1 || filtered.Tasks[0].ID != "b" {
+		t.Fatalf("FilterByFamily() = %+v, want only task b", filtered.Tasks)
+	}
+}
+
+func TestScaffoldCatalogFiltersByName(t *testing.T) {
+	catalog := ScaffoldCatalog{
+		Scaffolds: []Scaffold{
+			{Name: "baseline"},
+			{Name: "tool-assisted"},
+		},
+	}
+
+	filtered := catalog.FilterByName("tool-assisted")
+	if len(filtered.Scaffolds) != 1 || filtered.Scaffolds[0].Name != "tool-assisted" {
+		t.Fatalf("FilterByName() = %+v, want only scaffold tool-assisted", filtered.Scaffolds)
+	}
+}
