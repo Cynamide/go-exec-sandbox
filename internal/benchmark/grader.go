@@ -3,6 +3,7 @@ package benchmark
 import (
 	"encoding/csv"
 	"encoding/json"
+	"math/big"
 	"reflect"
 	"strings"
 
@@ -58,16 +59,16 @@ func jsonEquivalent(actual, expected string) bool {
 	}
 
 	var actualValue any
-	if err := json.Unmarshal([]byte(actual), &actualValue); err != nil {
+	if err := decodeJSON(actual, &actualValue); err != nil {
 		return false
 	}
 
 	var expectedValue any
-	if err := json.Unmarshal([]byte(expected), &expectedValue); err != nil {
+	if err := decodeJSON(expected, &expectedValue); err != nil {
 		return false
 	}
 
-	return reflect.DeepEqual(actualValue, expectedValue)
+	return jsonValuesEqual(actualValue, expectedValue)
 }
 
 func markdownEquivalent(actual, expected string) bool {
@@ -82,6 +83,70 @@ func markdownEquivalent(actual, expected string) bool {
 	}
 
 	return reflect.DeepEqual(actualRows, expectedRows)
+}
+
+func decodeJSON(raw string, target *any) error {
+	decoder := json.NewDecoder(strings.NewReader(raw))
+	decoder.UseNumber()
+	return decoder.Decode(target)
+}
+
+func jsonValuesEqual(actual, expected any) bool {
+	switch actualTyped := actual.(type) {
+	case map[string]any:
+		expectedTyped, ok := expected.(map[string]any)
+		if !ok || len(actualTyped) != len(expectedTyped) {
+			return false
+		}
+		for key, actualValue := range actualTyped {
+			expectedValue, ok := expectedTyped[key]
+			if !ok || !jsonValuesEqual(actualValue, expectedValue) {
+				return false
+			}
+		}
+		return true
+	case []any:
+		expectedTyped, ok := expected.([]any)
+		if !ok || len(actualTyped) != len(expectedTyped) {
+			return false
+		}
+		for i := range actualTyped {
+			if !jsonValuesEqual(actualTyped[i], expectedTyped[i]) {
+				return false
+			}
+		}
+		return true
+	case json.Number:
+		expectedTyped, ok := expected.(json.Number)
+		if !ok {
+			return false
+		}
+		return jsonNumbersEqual(actualTyped, expectedTyped)
+	case string:
+		expectedTyped, ok := expected.(string)
+		return ok && actualTyped == expectedTyped
+	case bool:
+		expectedTyped, ok := expected.(bool)
+		return ok && actualTyped == expectedTyped
+	case nil:
+		return expected == nil
+	default:
+		return reflect.DeepEqual(actual, expected)
+	}
+}
+
+func jsonNumbersEqual(actual, expected json.Number) bool {
+	actualRat, ok := new(big.Rat).SetString(actual.String())
+	if !ok {
+		return false
+	}
+
+	expectedRat, ok := new(big.Rat).SetString(expected.String())
+	if !ok {
+		return false
+	}
+
+	return actualRat.Cmp(expectedRat) == 0
 }
 
 func parseMarkdownTable(raw string) ([][]string, bool) {
@@ -99,18 +164,25 @@ func parseMarkdownTable(raw string) ([][]string, bool) {
 	}
 
 	rows := make([][]string, 0, len(lines)-1)
+	var headerWidth int
 	for i, line := range lines {
 		cells, ok := splitMarkdownRow(line)
 		if !ok {
 			return nil, false
 		}
 		if i == 1 {
-			if !isMarkdownSeparatorRow(cells) {
+			headerWidth = len(rows[0])
+			if !isMarkdownSeparatorRow(cells, headerWidth) {
 				return nil, false
 			}
 			continue
 		}
 		if i == 0 || i > 1 {
+			if i == 0 {
+				headerWidth = len(cells)
+			} else if len(cells) != headerWidth {
+				return nil, false
+			}
 			rows = append(rows, cells)
 		}
 	}
@@ -124,20 +196,20 @@ func splitMarkdownRow(line string) ([]string, bool) {
 	}
 
 	parts := strings.Split(line, "|")
-	cells := make([]string, 0, len(parts))
-	for _, part := range parts {
-		cell := strings.TrimSpace(part)
-		if cell == "" {
-			continue
-		}
-		cells = append(cells, cell)
+	if len(parts) < 3 {
+		return nil, false
 	}
 
-	return cells, len(cells) > 0
+	cells := make([]string, 0, len(parts)-2)
+	for i := 1; i < len(parts)-1; i++ {
+		cells = append(cells, strings.TrimSpace(parts[i]))
+	}
+
+	return cells, true
 }
 
-func isMarkdownSeparatorRow(cells []string) bool {
-	if len(cells) == 0 {
+func isMarkdownSeparatorRow(cells []string, width int) bool {
+	if len(cells) != width || width == 0 {
 		return false
 	}
 
@@ -157,7 +229,7 @@ func isMarkdownSeparatorRow(cells []string) bool {
 }
 
 func csvEquivalent(actual, expected string) bool {
-	if !strings.Contains(expected, ",") || !strings.Contains(actual, ",") {
+	if strings.Count(actual, "\n") < 1 || strings.Count(expected, "\n") < 1 {
 		return false
 	}
 
