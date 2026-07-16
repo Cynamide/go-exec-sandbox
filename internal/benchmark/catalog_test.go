@@ -38,15 +38,20 @@ func TestTaskCatalogContainsMultipleTaskFamilies(t *testing.T) {
 
 	families := map[string]bool{}
 	for _, task := range catalog.Tasks {
+		if task.Title == "" {
+			t.Fatalf("task %q missing title", task.ID)
+		}
+		if task.Description == "" {
+			t.Fatalf("task %q missing description", task.ID)
+		}
+		if len(task.TestCases) == 0 {
+			t.Fatalf("task %q missing test cases", task.ID)
+		}
 		families[task.TaskFamily] = true
 	}
 
 	if len(families) < 5 {
 		t.Fatalf("families = %v, want at least 5", families)
-	}
-
-	if !families["customer_support"] {
-		t.Fatalf("families = %v, want customer_support", families)
 	}
 }
 

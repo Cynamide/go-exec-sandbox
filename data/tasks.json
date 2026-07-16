@@ -70,18 +70,18 @@
     },
     {
       "id": "support-escalation-summary",
-      "title": "Summarize Support Escalations Into JSON",
-      "description": "Read newline-delimited support escalation records from stdin in the format '<priority>|<team>|<status>'. Produce a JSON report that counts open escalations by priority and by team.",
+      "title": "Summarize Support Escalations Into Markdown",
+      "description": "Read newline-delimited support escalation records from stdin in the format '<priority>|<team>|<status>'. Produce a markdown report that counts open escalations by team, sorted alphabetically by team.",
       "task_family": "customer_support",
       "language": "python",
       "test_cases": [
         {
           "input": "p1|billing|open\np2|billing|closed\np1|platform|open\n",
-          "expected_output": "{\"open_by_priority\":{\"p1\":2},\"open_by_team\":{\"billing\":1,\"platform\":1}}"
+          "expected_output": "| team | open escalations |\n| billing | 1 |\n| platform | 1 |"
         },
         {
           "input": "p3|ops|open\np2|ops|open\np3|success|closed\np1|ops|open\n",
-          "expected_output": "{\"open_by_priority\":{\"p1\":1,\"p2\":1,\"p3\":1},\"open_by_team\":{\"ops\":3}}"
+          "expected_output": "| team | open escalations |\n| ops | 3 |"
         }
       ]
     }
