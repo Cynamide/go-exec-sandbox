@@ -64,8 +64,11 @@ func TestTaskCatalogContainsMultipleTaskFamilies(t *testing.T) {
 			if task.ArtifactExpectation.Description == "" {
 				t.Fatalf("task %q missing artifact description", task.ID)
 			}
-			if task.ArtifactExpectation.ExpectedOutput == "" {
+			if len(task.TestCases) == 0 && task.ArtifactExpectation.ExpectedOutput == "" {
 				t.Fatalf("task %q missing artifact expected output", task.ID)
+			}
+			if len(task.TestCases) == 0 && task.ArtifactExpectation.Input == "" {
+				t.Fatalf("task %q missing artifact input", task.ID)
 			}
 		}
 		if len(task.TestCases) == 0 && task.ArtifactExpectation == nil {
@@ -85,7 +88,7 @@ func TestTaskCatalogContainsMultipleTaskFamilies(t *testing.T) {
 
 func TestLoadTaskCatalogRejectsTaskWithoutTestCases(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tasks.json")
-	if err := os.WriteFile(path, []byte(`{"tasks":[{"id":"artifact-task","title":"Artifact Task","description":"desc","task_family":"customer_support","language":"python"}]}`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"tasks":[{"id":"artifact-task","title":"Artifact Task","description":"desc","task_family":"support_workflows","language":"python"}]}`), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
@@ -96,7 +99,7 @@ func TestLoadTaskCatalogRejectsTaskWithoutTestCases(t *testing.T) {
 
 func TestLoadTaskCatalogAcceptsArtifactOnlyTask(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tasks.json")
-	if err := os.WriteFile(path, []byte(`{"tasks":[{"id":"artifact-task","title":"Artifact Task","description":"desc","task_family":"customer_support","language":"python","artifact_expectation":{"type":"markdown_report","format":"markdown","description":"artifact output","expected_output":"| team | open |\n| --- | --- |\n| billing | 1 |"}}]}`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"tasks":[{"id":"artifact-task","title":"Artifact Task","description":"desc","task_family":"support_workflows","language":"python","artifact_expectation":{"type":"markdown_report","format":"markdown","description":"artifact output","input":"p1|platform|open\np1|billing|open\n","expected_output":"| team | open |\n| --- | --- |\n| billing | 1 |\n| platform | 1 |"}}]}`), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
@@ -112,7 +115,7 @@ func TestLoadTaskCatalogAcceptsArtifactOnlyTask(t *testing.T) {
 
 func TestLoadTaskCatalogRejectsUnknownFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tasks.json")
-	if err := os.WriteFile(path, []byte(`{"tasks":[{"id":"task-1","title":"Task 1","description":"desc","task_family":"customer_support","language":"python","test_cases":[{"input":"","expected_output":"ok"}],"unexpected":"boom"}]}`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"tasks":[{"id":"task-1","title":"Task 1","description":"desc","task_family":"support_workflows","language":"python","test_cases":[{"input":"","expected_output":"ok"}],"unexpected":"boom"}]}`), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
@@ -123,7 +126,7 @@ func TestLoadTaskCatalogRejectsUnknownFields(t *testing.T) {
 
 func TestLoadTaskCatalogRejectsDuplicateTaskIDs(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tasks.json")
-	if err := os.WriteFile(path, []byte(`{"tasks":[{"id":"task-1","title":"Task 1","description":"desc","task_family":"customer_support","language":"python","test_cases":[{"input":"","expected_output":"ok"}]},{"id":"task-1","title":"Task 2","description":"desc","task_family":"customer_support","language":"python","test_cases":[{"input":"","expected_output":"ok"}]}]}`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"tasks":[{"id":"task-1","title":"Task 1","description":"desc","task_family":"support_workflows","language":"python","test_cases":[{"input":"","expected_output":"ok"}]},{"id":"task-1","title":"Task 2","description":"desc","task_family":"support_workflows","language":"python","test_cases":[{"input":"","expected_output":"ok"}]}]}`), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
@@ -134,7 +137,7 @@ func TestLoadTaskCatalogRejectsDuplicateTaskIDs(t *testing.T) {
 
 func TestLoadTaskCatalogRejectsMalformedArtifactMetadata(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tasks.json")
-	if err := os.WriteFile(path, []byte(`{"tasks":[{"id":"task-1","title":"Task 1","description":"desc","task_family":"customer_support","language":"python","artifact_expectation":{"type":"markdown_report","format":"markdown"},"test_cases":[{"input":"","expected_output":"ok"}]}]}`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"tasks":[{"id":"task-1","title":"Task 1","description":"desc","task_family":"support_workflows","language":"python","artifact_expectation":{"type":"markdown_report","format":"markdown"},"test_cases":[{"input":"","expected_output":"ok"}]}]}`), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
@@ -145,7 +148,7 @@ func TestLoadTaskCatalogRejectsMalformedArtifactMetadata(t *testing.T) {
 
 func TestLoadTaskCatalogRejectsTrailingJSON(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tasks.json")
-	if err := os.WriteFile(path, []byte(`{"tasks":[{"id":"task-1","title":"Task 1","description":"desc","task_family":"customer_support","language":"python","test_cases":[{"input":"","expected_output":"ok"}]}]} {"unexpected":true}`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"tasks":[{"id":"task-1","title":"Task 1","description":"desc","task_family":"support_workflows","language":"python","test_cases":[{"input":"","expected_output":"ok"}]}]} {"unexpected":true}`), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 

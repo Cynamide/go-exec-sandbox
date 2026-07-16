@@ -135,7 +135,13 @@ func validateTask(task Task) error {
 		return ErrInvalidTaskCatalog
 	}
 	if task.ArtifactExpectation != nil {
-		if task.ArtifactExpectation.Type == "" || task.ArtifactExpectation.Format == "" || task.ArtifactExpectation.Description == "" || task.ArtifactExpectation.ExpectedOutput == "" {
+		if task.ArtifactExpectation.Type == "" || task.ArtifactExpectation.Format == "" || task.ArtifactExpectation.Description == "" {
+			return ErrInvalidTaskCatalog
+		}
+		if !isSupportedArtifactFormat(task.ArtifactExpectation.Format) {
+			return ErrInvalidTaskCatalog
+		}
+		if len(task.TestCases) == 0 && (task.ArtifactExpectation.Input == "" || task.ArtifactExpectation.ExpectedOutput == "") {
 			return ErrInvalidTaskCatalog
 		}
 	}
@@ -150,4 +156,13 @@ func requireEOF(decoder *json.Decoder) error {
 	}
 
 	return nil
+}
+
+func isSupportedArtifactFormat(format string) bool {
+	switch format {
+	case "markdown", "csv", "json", "text":
+		return true
+	default:
+		return false
+	}
 }

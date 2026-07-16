@@ -1,6 +1,6 @@
 package benchmark
 
-// Problem remains a compatibility alias for legacy benchmark fixtures.
+// Problem is an alias for Task used by benchmark fixtures.
 type Problem = Task
 
 type TestCase struct {

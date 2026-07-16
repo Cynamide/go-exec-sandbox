@@ -9,7 +9,7 @@ import (
 )
 
 func TestRunTaskAppliesScaffoldPromptPrefix(t *testing.T) {
-	exec := fakeExecutor{
+	exec := &fakeExecutor{
 		resp: api.ExecutionResponse{Stdout: "ok"},
 	}
 
@@ -48,7 +48,7 @@ func TestRunTaskAppliesScaffoldPromptPrefix(t *testing.T) {
 }
 
 func TestRunTaskWithGraderUsesInjectedGrader(t *testing.T) {
-	exec := fakeExecutor{
+	exec := &fakeExecutor{
 		resp: api.ExecutionResponse{Stdout: "executor output"},
 	}
 
@@ -117,7 +117,7 @@ func TestDefaultGraderUsesMarkdownArtifactFormat(t *testing.T) {
 	task := Task{
 		ArtifactExpectation: &ArtifactExpectation{Format: "markdown"},
 	}
-	outcome := grader.Grade(task, api.ExecutionResponse{Stdout: "team | count\n--- | ---\napi | 2\nweb | 1"}, TestCase{ExpectedOutput: "team | count\n--- | ---\napi | 2\nweb | 1"})
+	outcome := grader.Grade(task, api.ExecutionResponse{Stdout: "| team | count |\n| --- | --- |\n| api | 2 |\n| web | 1 |"}, TestCase{ExpectedOutput: "team | count\n--- | ---\napi | 2\nweb | 1"})
 
 	if !outcome.Passed {
 		t.Fatalf("Outcome.Passed = false, want true")
@@ -129,7 +129,7 @@ func TestDefaultGraderUsesCSVArtifactFormat(t *testing.T) {
 	task := Task{
 		ArtifactExpectation: &ArtifactExpectation{Format: "csv"},
 	}
-	outcome := grader.Grade(task, api.ExecutionResponse{Stdout: "month,total\n2026-05,25\n2026-06,7"}, TestCase{ExpectedOutput: "month,total\n2026-05,25\n2026-06,7"})
+	outcome := grader.Grade(task, api.ExecutionResponse{Stdout: "\"month\",\"total\"\n\"2026-05\",\"25\"\n\"2026-06\",7"}, TestCase{ExpectedOutput: "month,total\n2026-05,25\n2026-06,7"})
 
 	if !outcome.Passed {
 		t.Fatalf("Outcome.Passed = false, want true")
@@ -149,7 +149,7 @@ func TestDefaultGraderUsesJSONArtifactFormat(t *testing.T) {
 }
 
 func TestRunTaskWithArtifactExpectationUsesSyntheticCase(t *testing.T) {
-	exec := fakeExecutor{
+	exec := &fakeExecutor{
 		resp: api.ExecutionResponse{Stdout: "| team | open |\n| --- | --- |\n| billing | 1 |"},
 	}
 
@@ -165,6 +165,7 @@ func TestRunTaskWithArtifactExpectationUsesSyntheticCase(t *testing.T) {
 			Type:           "markdown_report",
 			Format:         "markdown",
 			Description:    "Markdown table",
+			Input:          "p1|platform|open\np2|billing|closed\np1|billing|open\n",
 			ExpectedOutput: "| team | open |\n| --- | --- |\n| billing | 1 |",
 		},
 	}
@@ -190,6 +191,10 @@ func TestRunTaskWithArtifactExpectationUsesSyntheticCase(t *testing.T) {
 	if client.seenPrompt != "solve this" {
 		t.Fatalf("seenPrompt = %q, want %q", client.seenPrompt, "solve this")
 	}
+
+	if exec.seenReq.Stdin != task.ArtifactExpectation.Input {
+		t.Fatalf("stdin = %q, want %q", exec.seenReq.Stdin, task.ArtifactExpectation.Input)
+	}
 }
 
 func TestCodeExecutionAdapterDelegatesToSandbox(t *testing.T) {
@@ -212,10 +217,12 @@ func TestCodeExecutionAdapterDelegatesToSandbox(t *testing.T) {
 }
 
 type fakeExecutor struct {
-	resp api.ExecutionResponse
+	resp    api.ExecutionResponse
+	seenReq api.ExecutionRequest
 }
 
-func (f fakeExecutor) Execute(ctx context.Context, req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {
+func (f *fakeExecutor) Execute(ctx context.Context, req api.ExecutionRequest, cfg config.Config) (api.ExecutionResponse, error) {
+	f.seenReq = req
 	return f.resp, nil
 }
 

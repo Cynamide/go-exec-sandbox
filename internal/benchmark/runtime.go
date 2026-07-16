@@ -60,6 +60,7 @@ func RunTaskWithGrader(ctx context.Context, task Task, scaffold Scaffold, mode R
 			}
 		}
 		testCases = []TestCase{{
+			Input:          task.ArtifactExpectation.Input,
 			ExpectedOutput: task.ArtifactExpectation.ExpectedOutput,
 		}}
 	}

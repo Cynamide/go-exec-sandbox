@@ -448,8 +448,8 @@ This project is being developed as a benchmark harness for economically meaningf
 - **Benchmark Scope**
   - ✅ Code execution and validation against task-specific outputs
   - ✅ Support for stdin-driven workflows
-  - ✅ Support for software-engineering-style issue resolution
-  - 🚧 Expansion to other economically valuable workflows such as office, spreadsheet, web, and computer-use tasks
+  - ✅ Support for workflow-oriented task resolution
+  - 🚧 Expansion to additional economically valuable workflows such as office, spreadsheet, web, and computer-use tasks
 
 - **Enhanced Features**
   - 🚧 Batch evaluation mode for comparing multiple models
