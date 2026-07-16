@@ -12,15 +12,25 @@ func TestLoadTaskCatalogReturnsFamilies(t *testing.T) {
 		t.Fatalf("catalog.Tasks is empty")
 	}
 
-	foundFamily := false
+	gotFamilies := make(map[string]struct{}, len(catalog.Tasks))
 	for _, task := range catalog.Tasks {
-		if task.TaskFamily != "" {
-			foundFamily = true
-			break
-		}
+		gotFamilies[task.TaskFamily] = struct{}{}
 	}
-	if !foundFamily {
-		t.Fatalf("catalog.Tasks does not contain any task family")
+
+	wantFamilies := []string{
+		"software_engineering",
+		"browser_workflows",
+		"spreadsheets",
+		"terminal_workflows",
+	}
+	for _, family := range wantFamilies {
+		if _, ok := gotFamilies[family]; !ok {
+			t.Fatalf("catalog.Tasks missing task family %q", family)
+		}
+		delete(gotFamilies, family)
+	}
+	if len(gotFamilies) != 0 {
+		t.Fatalf("catalog.Tasks contains unexpected task families: %v", gotFamilies)
 	}
 }
 
@@ -34,14 +44,29 @@ func TestLoadScaffoldCatalogReturnsScaffolds(t *testing.T) {
 		t.Fatalf("catalog.Scaffolds is empty")
 	}
 
-	foundBaseline := false
+	gotScaffolds := make(map[string]struct{}, len(catalog.Scaffolds))
 	for _, scaffold := range catalog.Scaffolds {
-		if scaffold.Baseline || scaffold.Name == "baseline" {
-			foundBaseline = true
-			break
-		}
+		gotScaffolds[scaffold.Name] = struct{}{}
 	}
-	if !foundBaseline {
-		t.Fatalf("catalog.Scaffolds does not contain a baseline scaffold")
+
+	wantScaffolds := []string{
+		"baseline",
+		"tool-assisted",
+		"retrieval-assisted",
+	}
+	for _, name := range wantScaffolds {
+		if _, ok := gotScaffolds[name]; !ok {
+			t.Fatalf("catalog.Scaffolds missing scaffold %q", name)
+		}
+		delete(gotScaffolds, name)
+	}
+	if len(gotScaffolds) != 0 {
+		t.Fatalf("catalog.Scaffolds contains unexpected scaffold names: %v", gotScaffolds)
+	}
+
+	for _, scaffold := range catalog.Scaffolds {
+		if scaffold.Name == "baseline" && !scaffold.Baseline {
+			t.Fatalf("baseline scaffold has Baseline = false")
+		}
 	}
 }
