@@ -141,24 +141,14 @@ func loadBenchmarkCatalogs() (benchmark.TaskCatalog, benchmark.ScaffoldCatalog, 
 		return benchmark.TaskCatalog{}, benchmark.ScaffoldCatalog{}, err
 	}
 
-	taskPayload, err := os.ReadFile(tasksPath)
+	tasks, err := benchmark.LoadTaskCatalog(tasksPath)
 	if err != nil {
-		return benchmark.TaskCatalog{}, benchmark.ScaffoldCatalog{}, fmt.Errorf("read benchmark tasks: %w", err)
+		return benchmark.TaskCatalog{}, benchmark.ScaffoldCatalog{}, fmt.Errorf("load benchmark tasks: %w", err)
 	}
 
-	scaffoldPayload, err := os.ReadFile(scaffoldsPath)
+	scaffolds, err := benchmark.LoadScaffoldCatalog(scaffoldsPath)
 	if err != nil {
-		return benchmark.TaskCatalog{}, benchmark.ScaffoldCatalog{}, fmt.Errorf("read benchmark scaffolds: %w", err)
-	}
-
-	var tasks benchmark.TaskCatalog
-	if err := json.Unmarshal(taskPayload, &tasks); err != nil {
-		return benchmark.TaskCatalog{}, benchmark.ScaffoldCatalog{}, fmt.Errorf("decode benchmark tasks: %w", err)
-	}
-
-	var scaffolds benchmark.ScaffoldCatalog
-	if err := json.Unmarshal(scaffoldPayload, &scaffolds); err != nil {
-		return benchmark.TaskCatalog{}, benchmark.ScaffoldCatalog{}, fmt.Errorf("decode benchmark scaffolds: %w", err)
+		return benchmark.TaskCatalog{}, benchmark.ScaffoldCatalog{}, fmt.Errorf("load benchmark scaffolds: %w", err)
 	}
 
 	return tasks, scaffolds, nil

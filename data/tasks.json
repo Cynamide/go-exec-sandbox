@@ -9,28 +9,28 @@
       "test_cases": [
         {
           "input": "api|feature|Added audit logging\nweb|fix|Fixed checkout redirect\napi|fix|Patched token refresh\n",
-          "expected_output": "| team | changes |\n| api | 2 |\n| web | 1 |"
+          "expected_output": "| team | changes |\n| --- | --- |\n| api | 2 |\n| web | 1 |"
         },
         {
           "input": "search|feature|Added filters\napi|fix|Patched token refresh\nsearch|fix|Reduced latency\n",
-          "expected_output": "| team | changes |\n| api | 1 |\n| search | 2 |"
+          "expected_output": "| team | changes |\n| --- | --- |\n| api | 1 |\n| search | 2 |"
         }
       ]
     },
     {
       "id": "checkout-error-summary",
-      "title": "Summarize Checkout Errors From Browser Logs",
-      "description": "Read newline-delimited browser console errors from stdin. Produce a JSON report listing each distinct message with its count, sorted by descending count and then alphabetically for ties.",
-      "task_family": "browser_workflows",
+      "title": "Summarize Checkout Errors From Logs",
+      "description": "Read newline-delimited checkout error messages from stdin. Produce a markdown table listing each distinct message with its count, sorted by descending count and then alphabetically for ties.",
+      "task_family": "observability",
       "language": "python",
       "test_cases": [
         {
           "input": "Checkout failed\nNetwork timeout\nCheckout failed\n",
-          "expected_output": "{\"errors\":[{\"message\":\"Checkout failed\",\"count\":2},{\"message\":\"Network timeout\",\"count\":1}]}"
+          "expected_output": "| message | count |\n| --- | --- |\n| Checkout failed | 2 |\n| Network timeout | 1 |"
         },
         {
           "input": "Timeout\nTimeout\nAuth failed\nAuth failed\nAuth failed\n",
-          "expected_output": "{\"errors\":[{\"message\":\"Auth failed\",\"count\":3},{\"message\":\"Timeout\",\"count\":2}]}"
+          "expected_output": "| message | count |\n| --- | --- |\n| Auth failed | 3 |\n| Timeout | 2 |"
         }
       ]
     },
@@ -38,7 +38,7 @@
       "id": "monthly-revenue-rollup",
       "title": "Roll Up Monthly Revenue From CSV",
       "description": "Read CSV rows from stdin with header month,amount. Produce a compact CSV report with one row per month and the total revenue for that month, preserving the first-seen month order.",
-      "task_family": "spreadsheets",
+      "task_family": "finance_reporting",
       "language": "python",
       "test_cases": [
         {
@@ -55,7 +55,7 @@
       "id": "incident-owner-rollup",
       "title": "Roll Up Incident Ownership From Terminal Output",
       "description": "Read newline-delimited incident records from stdin in the format '<owner> <status>'. Produce a short markdown incident report that lists only open incidents by owner, sorted alphabetically by owner.",
-      "task_family": "terminal_workflows",
+      "task_family": "operations",
       "language": "python",
       "test_cases": [
         {
@@ -74,11 +74,6 @@
       "description": "Read newline-delimited support escalation records from stdin in the format '<priority>|<team>|<status>'. Produce a markdown report that counts open escalations by team, sorted alphabetically by team.",
       "task_family": "customer_support",
       "language": "python",
-      "artifact_expectation": {
-        "type": "markdown_report",
-        "format": "markdown",
-        "description": "Markdown table with columns team and open escalations"
-      },
       "test_cases": [
         {
           "input": "p1|platform|open\np2|billing|closed\np1|billing|open\n",

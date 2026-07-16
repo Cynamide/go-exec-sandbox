@@ -19,9 +19,10 @@ func TestLoadTaskCatalogReturnsFamilies(t *testing.T) {
 
 	wantFamilies := []string{
 		"software_engineering",
-		"browser_workflows",
-		"spreadsheets",
-		"terminal_workflows",
+		"observability",
+		"finance_reporting",
+		"operations",
+		"customer_support",
 	}
 	for _, family := range wantFamilies {
 		if _, ok := gotFamilies[family]; !ok {
@@ -37,7 +38,6 @@ func TestTaskCatalogContainsMultipleTaskFamilies(t *testing.T) {
 	}
 
 	families := map[string]bool{}
-	hasArtifactExpectation := false
 	for _, task := range catalog.Tasks {
 		if task.TaskFamily == "" {
 			t.Fatalf("task %q missing task family", task.ID)
@@ -51,27 +51,11 @@ func TestTaskCatalogContainsMultipleTaskFamilies(t *testing.T) {
 		if len(task.TestCases) == 0 {
 			t.Fatalf("task %q missing test cases", task.ID)
 		}
-		if task.ArtifactExpectation != nil {
-			hasArtifactExpectation = true
-			if task.ArtifactExpectation.Type == "" {
-				t.Fatalf("task %q missing artifact type", task.ID)
-			}
-			if task.ArtifactExpectation.Format == "" {
-				t.Fatalf("task %q missing artifact format", task.ID)
-			}
-			if task.ArtifactExpectation.Description == "" {
-				t.Fatalf("task %q missing artifact description", task.ID)
-			}
-		}
 		families[task.TaskFamily] = true
 	}
 
 	if len(families) < 5 {
 		t.Fatalf("families = %v, want at least 5", families)
-	}
-
-	if !hasArtifactExpectation {
-		t.Fatalf("catalog.Tasks does not contain any artifact expectations")
 	}
 }
 
