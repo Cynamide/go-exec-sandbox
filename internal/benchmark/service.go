@@ -7,14 +7,6 @@ import (
 	"gexec-sandbox/internal/config"
 )
 
-type TaskCatalog struct {
-	Tasks []Task `json:"tasks"`
-}
-
-type ScaffoldCatalog struct {
-	Scaffolds []Scaffold `json:"scaffolds"`
-}
-
 type BenchmarkServiceAPI interface {
 	Run(ctx context.Context) (BenchmarkReport, error)
 }
