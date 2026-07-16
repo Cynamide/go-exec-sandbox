@@ -74,6 +74,7 @@
       "description": "Read newline-delimited support escalation records from stdin in the format '<priority>|<team>|<status>'. Produce a markdown report that counts open escalations by team, sorted alphabetically by team.",
       "task_family": "customer_support",
       "language": "python",
+      "artifact_expectation": "markdown table with columns team and open escalations",
       "test_cases": [
         {
           "input": "p1|billing|open\np2|billing|closed\np1|platform|open\n",
