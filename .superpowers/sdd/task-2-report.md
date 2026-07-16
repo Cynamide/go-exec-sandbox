@@ -151,3 +151,68 @@ ok  	gexec-sandbox/internal/benchmark	(cached)
 
 - `POST /benchmark/run` is now backed by a runnable benchmark service, but actual end-to-end execution still depends on Ollama and sandbox availability in the runtime environment.
 - Final code commit: `384da32` (`Wire benchmark route into evaluator`).
+
+---
+
+## Reviewer Fix 2 Follow-Up
+
+### Change Summary
+
+- Replaced the evaluator's benchmark input wiring so it no longer builds the benchmark from the toy [`data/problems.json`](/Users/arjit/Documents/go-exec-sandbox/data/problems.json) fixture.
+- Removed the entrypoint-local scaffold catalog from [`cmd/evaluator/main.go`](/Users/arjit/Documents/go-exec-sandbox/cmd/evaluator/main.go) and switched the evaluator to load both task and scaffold catalogs from reusable fixture files.
+- Added reusable benchmark fixtures at [`data/tasks.json`](/Users/arjit/Documents/go-exec-sandbox/data/tasks.json) and [`data/scaffolds.json`](/Users/arjit/Documents/go-exec-sandbox/data/scaffolds.json) with benchmark-oriented task families and shared scaffold definitions.
+- Kept the HTTP adapter thin: [`cmd/evaluator/main.go`](/Users/arjit/Documents/go-exec-sandbox/cmd/evaluator/main.go) now assembles the benchmark service through a tiny `loadBenchmarkCatalogs` helper, while [`internal/httpapi/benchmark_handler.go`](/Users/arjit/Documents/go-exec-sandbox/internal/httpapi/benchmark_handler.go) remains unchanged.
+- Kept the route-registration test and expanded [`cmd/evaluator/main_test.go`](/Users/arjit/Documents/go-exec-sandbox/cmd/evaluator/main_test.go) with a focused loader test that proves the evaluator uses reusable benchmark catalogs instead of the toy problem fixture.
+
+### Exact Test Commands And Results
+
+1. Red test before the implementation:
+
+```bash
+go test ./cmd/evaluator -run TestLoadBenchmarkCatalogsUsesReusableFixtureFiles -v
+```
+
+Result:
+
+```text
+# gexec-sandbox/cmd/evaluator [gexec-sandbox/cmd/evaluator.test]
+cmd/evaluator/main_test.go:41:27: undefined: loadBenchmarkCatalogs
+FAIL	gexec-sandbox/cmd/evaluator [build failed]
+FAIL
+```
+
+2. Focused evaluator verification after the fix:
+
+```bash
+go test ./cmd/evaluator -run 'Test(BuildMuxRegistersBenchmarkRunRoute|LoadBenchmarkCatalogsUsesReusableFixtureFiles)' -v
+```
+
+Result:
+
+```text
+=== RUN   TestBuildMuxRegistersBenchmarkRunRoute
+--- PASS: TestBuildMuxRegistersBenchmarkRunRoute (0.00s)
+=== RUN   TestLoadBenchmarkCatalogsUsesReusableFixtureFiles
+--- PASS: TestLoadBenchmarkCatalogsUsesReusableFixtureFiles (0.00s)
+PASS
+ok  	gexec-sandbox/cmd/evaluator	0.513s
+```
+
+3. Required package verification:
+
+```bash
+go test ./internal/httpapi ./cmd/evaluator ./internal/benchmark -v
+```
+
+Result:
+
+```text
+ok  	gexec-sandbox/internal/httpapi	(cached)
+ok  	gexec-sandbox/cmd/evaluator	0.359s
+ok  	gexec-sandbox/internal/benchmark	(cached)
+```
+
+### Final Concern Check
+
+- The reusable catalogs are now loaded only by the evaluator entrypoint helper, not by a shared benchmark package loader yet, so other surfaces would need to opt into the same fixture path if they are added later.
+- No new commit created for this reviewer-fix pass.

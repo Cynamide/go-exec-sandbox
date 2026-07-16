@@ -60,8 +60,8 @@ func TestBenchmarkServiceRunReturnsReport(t *testing.T) {
 		t.Fatalf("len(Baseline.Runs) = %d, want 1", len(report.Baseline.Runs))
 	}
 
-	if len(report.Scaffolded.Runs) != 2 {
-		t.Fatalf("len(Scaffolded.Runs) = %d, want 2", len(report.Scaffolded.Runs))
+	if len(report.Scaffolded.Runs) != 1 {
+		t.Fatalf("len(Scaffolded.Runs) = %d, want 1", len(report.Scaffolded.Runs))
 	}
 
 	if report.Baseline.Runs[0].Mode != RunModeBaseline {
@@ -70,6 +70,10 @@ func TestBenchmarkServiceRunReturnsReport(t *testing.T) {
 
 	if report.Scaffolded.Runs[0].Mode != RunModeScaffolded {
 		t.Fatalf("Scaffolded mode = %q, want %q", report.Scaffolded.Runs[0].Mode, RunModeScaffolded)
+	}
+
+	if report.ScaffoldedScaffold != "tool-assisted" {
+		t.Fatalf("ScaffoldedScaffold = %q, want tool-assisted", report.ScaffoldedScaffold)
 	}
 
 	if report.Baseline.SuccessRate != 0 {
@@ -92,12 +96,20 @@ func TestBenchmarkServiceRunReturnsReport(t *testing.T) {
 		t.Fatalf("Scaffolds[0].Scaffold.Name = %q, want critic", report.Scaffolds[0].Scaffold.Name)
 	}
 
+	if report.Scaffolds[0].Lift != 0 {
+		t.Fatalf("Scaffolds[0].Lift = %v, want 0", report.Scaffolds[0].Lift)
+	}
+
 	if report.Scaffolds[0].Group.SuccessRate != 0 {
 		t.Fatalf("Scaffolds[0].Group.SuccessRate = %v, want 0", report.Scaffolds[0].Group.SuccessRate)
 	}
 
 	if report.Scaffolds[1].Scaffold.Name != "tool-assisted" {
 		t.Fatalf("Scaffolds[1].Scaffold.Name = %q, want tool-assisted", report.Scaffolds[1].Scaffold.Name)
+	}
+
+	if report.Scaffolds[1].Lift != 1 {
+		t.Fatalf("Scaffolds[1].Lift = %v, want 1", report.Scaffolds[1].Lift)
 	}
 
 	if report.Scaffolds[1].Group.SuccessRate != 1 {
