@@ -57,16 +57,29 @@
 
 ### Benchmark layer
 
-- Benchmark scaffolding lives in:
-  - [internal/benchmark/types.go](/Users/arjit/Documents/go-exec-sandbox/internal/benchmark/types.go)
-  - [internal/benchmark/harness.go](/Users/arjit/Documents/go-exec-sandbox/internal/benchmark/harness.go)
+- Benchmark execution is centered in:
+  - [internal/benchmark/service.go](/Users/arjit/Documents/go-exec-sandbox/internal/benchmark/service.go)
+  - [internal/benchmark/report.go](/Users/arjit/Documents/go-exec-sandbox/internal/benchmark/report.go)
+  - [internal/benchmark/catalog.go](/Users/arjit/Documents/go-exec-sandbox/internal/benchmark/catalog.go)
+  - [internal/benchmark/model.go](/Users/arjit/Documents/go-exec-sandbox/internal/benchmark/model.go)
 - The benchmark package defines:
-  - `Problem`
-  - `TestCase`
-  - `Report`
-  - `RunEvaluation`
-  - `extractCode`
-- A sample problem set exists in [data/problems.json](/Users/arjit/Documents/go-exec-sandbox/data/problems.json)
+  - `TaskCatalog`
+  - `ScaffoldCatalog`
+  - `Task`
+  - `Scaffold`
+  - `Run`
+  - `Outcome`
+  - `BenchmarkReport`
+  - `BenchmarkService`
+- Benchmark inputs are stored in:
+  - [data/tasks.json](/Users/arjit/Documents/go-exec-sandbox/data/tasks.json)
+  - [data/scaffolds.json](/Users/arjit/Documents/go-exec-sandbox/data/scaffolds.json)
+- Tasks can verify:
+  - stdin/stdout expectations through test cases
+  - structured artifact expectations such as markdown, CSV, JSON, or text outputs
+- The benchmark surface is available through:
+  - the `benchmark` CLI mode in [cmd/evaluator/main.go](/Users/arjit/Documents/go-exec-sandbox/cmd/evaluator/main.go)
+  - the `POST /benchmark/run` endpoint in [cmd/evaluator/main.go](/Users/arjit/Documents/go-exec-sandbox/cmd/evaluator/main.go)
 
 ### Observability and middleware
 
@@ -87,10 +100,14 @@
 ## Repository Files
 
 - `cmd/evaluator/main.go` - service entrypoint
-- `data/problems.json` - sample benchmark/problem dataset
+- `data/tasks.json` - benchmark task catalog
+- `data/scaffolds.json` - benchmark scaffold catalog
 - `internal/api/types.go` - request and response types
-- `internal/benchmark/harness.go` - benchmark runner logic
-- `internal/benchmark/types.go` - benchmark data models
+- `internal/benchmark/catalog.go` - benchmark catalog loading and validation
+- `internal/benchmark/harness.go` - legacy pass-rate evaluation helper
+- `internal/benchmark/model.go` - benchmark domain models
+- `internal/benchmark/report.go` - benchmark aggregation and reporting
+- `internal/benchmark/service.go` - benchmark execution orchestration
 - `internal/config/config.go` - environment-based config loading
 - `internal/llm/llm.go` - Ollama client helpers
 - `internal/metrics/metrics.go` - atomic request/error counters
@@ -106,11 +123,11 @@
 ## Documentation Shape
 
 - The README presents the project as a secure execution sandbox and LLM evaluation harness
-- The README also contains a roadmap section that describes benchmark-oriented goals
-- One README reference points to `cmd/server/main.go`, but the actual entrypoint in the repo is `cmd/evaluator/main.go`
+- The README also contains a roadmap section that describes implemented benchmark capabilities and remaining work
+- The benchmark design and planning documents live under [docs/superpowers](/Users/arjit/Documents/go-exec-sandbox/docs/superpowers)
 
 ## Current State Summary
 
 - The repository already includes the core HTTP service, Docker-backed sandbox execution, Ollama connectivity, metrics, and rate limiting
-- The repository also includes benchmark data structures and an evaluation harness scaffold
+- The repository also includes scaffold-aware benchmark execution, catalog loading, grading, and report generation
 - The codebase is organized around a single executable service with supporting internal packages

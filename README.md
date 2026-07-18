@@ -6,6 +6,8 @@ A secure code execution service and benchmark harness for economically meaningfu
 - 🐳 **Secure Execution**: Code runs in isolated Docker containers with network disabled
 - ⚡ **Multi-Language Support**: Python and Golang out of the box (easily extensible)
 - 🤖 **LLM Integration**: Built-in Ollama client for local LLM inference
+- 🧱 **Scaffold-Aware Benchmarking**: Compare baseline and scaffolded runs across the same workflow tasks
+- 📝 **Artifact-Aware Task Catalogs**: Benchmark tasks can verify stdout and structured artifacts such as markdown, CSV, and JSON
 - 🛡️ **Resource Limits**: Configurable memory and CPU quotas prevent abuse
 - ⏱️ **Timeout Control**: Enforce execution time limits per request
 - ✅ **Robust Validation**: Input validation for language support and submitted source
@@ -171,6 +173,20 @@ docker run -p 8080:8080 \
 }
 ```
 
+### Run Benchmark
+
+**Endpoint**: `POST /benchmark/run`
+
+Runs the benchmark service and returns a JSON report with:
+
+- total task coverage
+- baseline success rate
+- scaffolded success rate
+- scaffold lift
+- per-family breakdowns
+- per-scaffold breakdowns
+- per-run outcomes
+
 ### Rate Limiting
 
 The `/execute` endpoint is rate limited to **10 requests per minute per IP address** (configurable).
@@ -317,8 +333,11 @@ gexec-sandbox/
 │   ├── api/
 │   │   └── types.go         # Request/response types
 │   ├── benchmark/
-│   │   ├── harness.go       # Benchmark harness for running evaluations
-│   │   └── types.go         # Benchmark-specific type definitions
+│   │   ├── catalog.go       # Task and scaffold catalog loading and validation
+│   │   ├── harness.go       # Legacy pass-rate evaluation helper
+│   │   ├── model.go         # Benchmark task, scaffold, run, and outcome models
+│   │   ├── report.go        # Scaffold-aware benchmark report aggregation
+│   │   └── service.go       # Benchmark execution orchestration
 │   ├── config/
 │   │   └── config.go        # Configuration management with env var support
 │   ├── llm/
@@ -408,6 +427,9 @@ This project is being developed as a benchmark harness for economically meaningf
 
 - **Benchmark Harness**
   - ✅ Architected Go-based evaluation system orchestrating local inference (Ollama)
+  - ✅ Scaffold-aware benchmark execution with baseline and scaffolded runs
+  - ✅ JSON task and scaffold catalogs loaded through a validation layer
+  - ✅ Report aggregation for overall, per-family, and per-scaffold lift
   - ✅ Docker Compose orchestration for Ollama and evaluator services
   - ✅ Environment-based configuration for model selection and host settings
   - ✅ Connection handling and availability checking for Ollama service
@@ -431,27 +453,32 @@ This project is being developed as a benchmark harness for economically meaningf
   - ✅ Rate limiting and request metrics
   - ✅ Structured JSON API responses
   - ✅ Graceful shutdown with container cleanup
+  - ✅ HTTP benchmark run endpoint and local benchmark CLI mode
 
 ### 🚧 In Progress / Planned Features
 
 - **Benchmarking Pipeline**
-  - ✅ Benchmark harness infrastructure (internal/benchmark/)
-  - ✅ Task and scaffold catalog structure (data/tasks.json, data/scaffolds.json)
-  - ✅ Integration of LLM code generation with execution
-  - ✅ Catalog management system for tasks and verification data
+  - ✅ Benchmark harness infrastructure across task catalogs, scaffold catalogs, execution, grading, and reporting
+  - ✅ Task and scaffold catalog structure (`data/tasks.json`, `data/scaffolds.json`)
+  - ✅ Integration of LLM code generation with sandbox execution
+  - ✅ Catalog management system for workflow tasks and artifact expectations
 
 - **Evaluation Metrics**
-  - ✅ Pass@k metric calculation (k=1, k=5, k=10)
-  - 🚧 Statistical analysis and reporting
-  - 🚧 Performance benchmarking across multiple models
+  - ✅ Baseline success rate tracking
+  - ✅ Scaffolded success rate tracking
+  - ✅ Lift reporting across scaffold conditions
+  - 🚧 Richer artifact grading modes and judge-driven scoring configuration
+  - 🚧 Cross-model benchmark matrices and comparison workflows
 
 - **Benchmark Scope**
   - ✅ Code execution and validation against task-specific outputs
   - ✅ Support for stdin-driven workflows
   - ✅ Support for workflow-oriented task resolution
-  - 🚧 Expansion to additional economically valuable workflows such as office, spreadsheet, web, and computer-use tasks
+  - ✅ Artifact-aware tasks in the catalog model
+  - 🚧 Expansion to additional economically valuable workflows such as browser, spreadsheet, document, and computer-use tasks
 
 - **Enhanced Features**
+  - 🚧 Centralized benchmark manifest for configuring models, scaffolds, tools, grading, and fixtures
   - 🚧 Batch evaluation mode for comparing multiple models
   - 🚧 Result caching and persistence
   - 🚧 Progress tracking and status reporting
@@ -461,10 +488,10 @@ This project is being developed as a benchmark harness for economically meaningf
 
 - Multi-model comparison support
 - Distributed evaluation setup
-- Custom workflow verification format support
+- Additional provider backends and endpoint types
 - Performance profiling and optimization
 - Result visualization and dashboards
-- Integration with additional LLM backends
+- Richer workflow and artifact verification formats
 
 ## License
 
