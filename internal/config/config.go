@@ -20,7 +20,7 @@ func LoadConfig() Config {
 
 	ollamaModel := os.Getenv("OLLAMA_MODEL")
 	if ollamaModel == "" {
-		panic("OLLAMA_MODEL environment variable is required")
+		ollamaModel = "qwen3:4b"
 	}
 
 	return Config{

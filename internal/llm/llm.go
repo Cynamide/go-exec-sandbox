@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
+	"net/url"
 	"time"
 
 	"gexec-sandbox/internal/config"
@@ -20,11 +22,15 @@ type Client struct {
 }
 
 func NewClient() (*Client, error) {
-	client, err := api.ClientFromEnvironment()
+	return NewClientWithConfig(config.LoadConfig())
+}
+
+func NewClientWithConfig(cfg config.Config) (*Client, error) {
+	client, err := ollamaAPIClient(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Ollama client: %w", err)
 	}
-	return &Client{client: client, cfg: config.LoadConfig()}, nil
+	return &Client{client: client, cfg: cfg}, nil
 }
 
 func (c *Client) chatRequest(problem string, language string) *api.ChatRequest {
@@ -64,7 +70,11 @@ func (c *Client) GenerateCode(ctx context.Context, problem string, language stri
 }
 
 func WaitForOllama(ctx context.Context) error {
-	client, err := api.ClientFromEnvironment()
+	return WaitForOllamaWithConfig(ctx, config.LoadConfig())
+}
+
+func WaitForOllamaWithConfig(ctx context.Context, cfg config.Config) error {
+	client, err := ollamaAPIClient(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to create Ollama client: %w", err)
 	}
@@ -93,7 +103,7 @@ func WaitForOllama(ctx context.Context) error {
 func PullModel() error {
 	cfg := config.LoadConfig()
 
-	client, err := api.ClientFromEnvironment()
+	client, err := ollamaAPIClient(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to create Ollama client: %w", err)
 	}
@@ -124,7 +134,7 @@ func PullModel() error {
 func CheckModelExists() (bool, error) {
 	cfg := config.LoadConfig()
 
-	client, err := api.ClientFromEnvironment()
+	client, err := ollamaAPIClient(cfg)
 	if err != nil {
 		return false, fmt.Errorf("failed to create Ollama client: %w", err)
 	}
@@ -143,4 +153,17 @@ func CheckModelExists() (bool, error) {
 	}
 
 	return false, nil
+}
+
+func ollamaAPIClient(cfg config.Config) (*api.Client, error) {
+	if cfg.OLLAMAHost == "" {
+		return api.ClientFromEnvironment()
+	}
+
+	baseURL, err := url.Parse(cfg.OLLAMAHost)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.NewClient(baseURL, http.DefaultClient), nil
 }

@@ -19,6 +19,7 @@ import (
 	"gexec-sandbox/internal/config"
 	"gexec-sandbox/internal/httpapi"
 	"gexec-sandbox/internal/llm"
+	"gexec-sandbox/internal/manifest"
 	"gexec-sandbox/internal/metrics"
 	"gexec-sandbox/internal/middleware"
 	"gexec-sandbox/internal/sandbox"
@@ -109,25 +110,34 @@ func buildMux(cfg config.Config, benchmarkService benchmark.BenchmarkServiceAPI)
 	return mux
 }
 
-func newBenchmarkService(cfg config.Config) (benchmark.BenchmarkService, error) {
-	tasks, scaffolds, err := loadBenchmarkCatalogs()
-	if err != nil {
-		return benchmark.BenchmarkService{}, err
-	}
-
-	client, err := llm.NewClient()
+func newBenchmarkService(loaded manifest.Loaded) (benchmark.BenchmarkService, error) {
+	client, err := llm.NewClientWithConfig(loaded.Runtime)
 	if err != nil {
 		return benchmark.BenchmarkService{}, fmt.Errorf("create benchmark llm client: %w", err)
 	}
 
 	return benchmark.BenchmarkService{
-		Tasks:     tasks,
-		Scaffolds: scaffolds,
+		Tasks:     loaded.Tasks,
+		Scaffolds: loaded.Scaffolds,
 		Client:    client,
 		Executor:  benchmark.NewCodeExecutionAdapter(),
 		Grader:    benchmark.DefaultGrader{},
-		Config:    cfg,
+		Config:    loaded.Runtime,
 	}, nil
+}
+
+func loadBenchmarkManifest() (manifest.Loaded, error) {
+	path, err := repoDataPath("benchmark.yaml")
+	if err != nil {
+		return manifest.Loaded{}, err
+	}
+
+	loaded, err := manifest.Load(path)
+	if err != nil {
+		return manifest.Loaded{}, fmt.Errorf("load benchmark manifest: %w", err)
+	}
+
+	return loaded, nil
 }
 
 func loadBenchmarkCatalogs() (benchmark.TaskCatalog, benchmark.ScaffoldCatalog, error) {
@@ -155,13 +165,17 @@ func loadBenchmarkCatalogs() (benchmark.TaskCatalog, benchmark.ScaffoldCatalog, 
 }
 
 func benchmarkDataPath(name string) (string, error) {
+	return repoDataPath(filepath.Join("data", name))
+}
+
+func repoDataPath(name string) (string, error) {
 	_, currentFile, _, ok := runtime.Caller(0)
 	if !ok {
 		return "", fmt.Errorf("resolve evaluator source path")
 	}
 
 	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(currentFile), "..", ".."))
-	return filepath.Join(repoRoot, "data", name), nil
+	return filepath.Join(repoRoot, name), nil
 }
 
 func runBenchmarkCLI(args []string, service benchmark.BenchmarkServiceAPI) (string, error) {
@@ -191,18 +205,22 @@ func runBenchmarkCLIWithContext(ctx context.Context, args []string, service benc
 }
 
 func main() {
-	cfg := config.LoadConfig()
+	loaded, err := loadBenchmarkManifest()
+	if err != nil {
+		log.Fatalf("Failed to load benchmark manifest: %v", err)
+	}
+	cfg := loaded.Runtime
 	rootCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	log.Println("Checking Ollama availability...")
-	if err := llm.WaitForOllama(rootCtx); err != nil {
+	if err := llm.WaitForOllamaWithConfig(rootCtx, cfg); err != nil {
 		log.Fatalf("Failed to connect to Ollama: %v", err)
 	}
 
 	log.Printf("Model %s should be available from Ollama service", cfg.OLLAMAModel)
 
-	benchmarkService, err := newBenchmarkService(cfg)
+	benchmarkService, err := newBenchmarkService(loaded)
 	if err != nil {
 		log.Fatalf("Failed to initialize benchmark service: %v", err)
 	}

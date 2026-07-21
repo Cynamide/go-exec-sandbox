@@ -97,6 +97,17 @@ func TestLoadTaskCatalogRejectsTaskWithoutTestCases(t *testing.T) {
 	}
 }
 
+func TestLoadTaskCatalogRejectsEmptyCatalog(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tasks.json")
+	if err := os.WriteFile(path, []byte(`{"tasks":[]}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	if _, err := LoadTaskCatalog(path); err == nil {
+		t.Fatal("LoadTaskCatalog() error = nil, want empty task catalog error")
+	}
+}
+
 func TestLoadTaskCatalogAcceptsArtifactOnlyTask(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tasks.json")
 	if err := os.WriteFile(path, []byte(`{"tasks":[{"id":"artifact-task","title":"Artifact Task","description":"desc","task_family":"support_workflows","language":"python","artifact_expectation":{"type":"markdown_report","format":"markdown","description":"artifact output","input":"p1|platform|open\np1|billing|open\n","expected_output":"| team | open |\n| --- | --- |\n| billing | 1 |\n| platform | 1 |"}}]}`), 0o600); err != nil {

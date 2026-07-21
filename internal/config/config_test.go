@@ -29,18 +29,12 @@ func TestLoadConfigUsesDefaultsAndEnvOverrides(t *testing.T) {
 	}
 }
 
-func TestLoadConfigPanicsWithoutModel(t *testing.T) {
+func TestLoadConfigUsesDefaultModelWithoutEnv(t *testing.T) {
 	t.Setenv("OLLAMA_MODEL", "")
 
-	defer func() {
-		recovered := recover()
-		if recovered == nil {
-			t.Fatal("LoadConfig() did not panic without OLLAMA_MODEL")
-		}
-		if recovered != "OLLAMA_MODEL environment variable is required" {
-			t.Fatalf("panic = %v, want OLLAMA_MODEL environment variable is required", recovered)
-		}
-	}()
+	cfg := LoadConfig()
 
-	_ = LoadConfig()
+	if cfg.OLLAMAModel != "qwen3:4b" {
+		t.Fatalf("OLLAMAModel = %q, want qwen3:4b", cfg.OLLAMAModel)
+	}
 }

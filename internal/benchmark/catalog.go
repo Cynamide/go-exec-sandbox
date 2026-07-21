@@ -34,17 +34,8 @@ func LoadTaskCatalog(path string) (TaskCatalog, error) {
 		return TaskCatalog{}, err
 	}
 
-	for _, task := range catalog.Tasks {
-		if err := validateTask(task); err != nil {
-			return TaskCatalog{}, err
-		}
-	}
-	seenIDs := make(map[string]struct{}, len(catalog.Tasks))
-	for _, task := range catalog.Tasks {
-		if _, ok := seenIDs[task.ID]; ok {
-			return TaskCatalog{}, ErrInvalidTaskCatalog
-		}
-		seenIDs[task.ID] = struct{}{}
+	if err := ValidateTaskCatalog(catalog); err != nil {
+		return TaskCatalog{}, err
 	}
 
 	return catalog, nil
@@ -66,14 +57,42 @@ func LoadScaffoldCatalog(path string) (ScaffoldCatalog, error) {
 		return ScaffoldCatalog{}, err
 	}
 
+	if err := ValidateScaffoldCatalog(catalog); err != nil {
+		return ScaffoldCatalog{}, ErrInvalidTaskCatalog
+	}
+
+	return catalog, nil
+}
+
+func ValidateTaskCatalog(catalog TaskCatalog) error {
+	if len(catalog.Tasks) == 0 {
+		return ErrInvalidTaskCatalog
+	}
+	for _, task := range catalog.Tasks {
+		if err := validateTask(task); err != nil {
+			return err
+		}
+	}
+	seenIDs := make(map[string]struct{}, len(catalog.Tasks))
+	for _, task := range catalog.Tasks {
+		if _, ok := seenIDs[task.ID]; ok {
+			return ErrInvalidTaskCatalog
+		}
+		seenIDs[task.ID] = struct{}{}
+	}
+
+	return nil
+}
+
+func ValidateScaffoldCatalog(catalog ScaffoldCatalog) error {
 	seenNames := make(map[string]struct{}, len(catalog.Scaffolds))
 	baselineCount := 0
 	for _, scaffold := range catalog.Scaffolds {
 		if scaffold.Name == "" {
-			return ScaffoldCatalog{}, ErrInvalidTaskCatalog
+			return ErrInvalidTaskCatalog
 		}
 		if _, ok := seenNames[scaffold.Name]; ok {
-			return ScaffoldCatalog{}, ErrInvalidTaskCatalog
+			return ErrInvalidTaskCatalog
 		}
 		seenNames[scaffold.Name] = struct{}{}
 		if scaffold.Baseline {
@@ -81,10 +100,10 @@ func LoadScaffoldCatalog(path string) (ScaffoldCatalog, error) {
 		}
 	}
 	if baselineCount != 1 {
-		return ScaffoldCatalog{}, ErrInvalidTaskCatalog
+		return ErrInvalidTaskCatalog
 	}
 
-	return catalog, nil
+	return nil
 }
 
 func (c TaskCatalog) FilterByFamily(family string) TaskCatalog {

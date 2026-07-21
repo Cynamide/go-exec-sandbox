@@ -32,6 +32,7 @@ Thumbs.db
 /bin/
 /dist/
 .gocache/
+.cache/
 .tmp/
 
 # Environment files

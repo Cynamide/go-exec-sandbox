@@ -37,11 +37,13 @@ func TestBuildMuxRegistersBenchmarkRunRoute(t *testing.T) {
 	}
 }
 
-func TestLoadBenchmarkCatalogsUsesReusableFixtureFiles(t *testing.T) {
-	tasks, scaffolds, err := loadBenchmarkCatalogs()
+func TestLoadBenchmarkManifestUsesReusableFixtureFiles(t *testing.T) {
+	loaded, err := loadBenchmarkManifest()
 	if err != nil {
-		t.Fatalf("loadBenchmarkCatalogs() error = %v", err)
+		t.Fatalf("loadBenchmarkManifest() error = %v", err)
 	}
+	tasks := loaded.Tasks
+	scaffolds := loaded.Scaffolds
 
 	if len(tasks.Tasks) == 0 {
 		t.Fatal("tasks.Tasks is empty")
@@ -83,6 +85,10 @@ func TestLoadBenchmarkCatalogsUsesReusableFixtureFiles(t *testing.T) {
 
 	if tasks.Tasks[0].ID == toyProblems[0].ID {
 		t.Fatalf("first benchmark task ID = %q, unexpectedly matches toy problem fixture", tasks.Tasks[0].ID)
+	}
+
+	if loaded.Runtime.OLLAMAModel == "" {
+		t.Fatal("manifest runtime missing OLLAMAModel")
 	}
 }
 

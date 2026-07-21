@@ -54,19 +54,25 @@ cd gexec-sandbox
 # Install dependencies
 go mod download
 
-# Copy environment file and configure
+# Copy environment file if you want to override the default Ollama host
 cp .env.example .env
-# Edit .env to set your preferred Ollama model
 ```
 
-## Environment Configuration
+## Benchmark Configuration
 
-Create a `.env` file in the project root:
+The evaluator reads benchmark runtime, model, task, and scaffold settings from `benchmark.yaml` in the project root.
+
+The currently implemented manifest fields are:
+
+- `runtime_defaults.timeout_ms`
+- `providers` entries with `kind: ollama`
+- one enabled Ollama model under `models`
+- `tasks` with IDs, titles, descriptions, families, languages, artifact expectations, and test cases
+- `scaffolds` with baseline flag, prompt prefix, descriptions, and tool metadata
+
+Environment variables can still override local service location:
 
 ```bash
-# Required: Ollama model to use (set in .env before running)
-OLLAMA_MODEL=qwen3:4b
-
 # Optional: Ollama host URL (default: http://localhost:11434)
 OLLAMA_HOST=http://localhost:11434
 ```
@@ -121,7 +127,6 @@ docker build -t gexec-sandbox .
 docker run -p 8080:8080 \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -e OLLAMA_HOST=http://host.docker.internal:11434 \
-  -e OLLAMA_MODEL=qwen3:4b \
   gexec-sandbox
 ```
 
@@ -266,16 +271,19 @@ curl -X POST http://localhost:8080/execute \
 
 ## Configuration
 
-### Environment Variables
+### Benchmark Manifest
 
-The evaluator reads configuration from environment variables:
+Edit `benchmark.yaml` to configure the currently supported benchmark surface:
 
-- `OLLAMA_HOST`: Ollama server URL (default: `http://localhost:11434`)
-- `OLLAMA_MODEL`: Model name to use (required, e.g., `qwen3:4b`, `codellama:latest`)
+- runtime timeout
+- Ollama provider host
+- enabled Ollama model
+- benchmark tasks
+- benchmark scaffolds
 
 ### Code Configuration
 
-Edit `internal/config/config.go` to customize:
+Language Docker images and sandbox memory limits are still code-backed in `internal/config/config.go`:
 
 ```go
 Config{
@@ -326,9 +334,10 @@ gexec-sandbox/
 ├── cmd/
 │   └── evaluator/
 │       └── main.go          # HTTP server, LLM integration, graceful shutdown, and handlers
+├── benchmark.yaml           # Supported benchmark runtime, model, task, and scaffold config
 ├── data/
-│   ├── tasks.json           # Benchmark task catalog
-│   ├── scaffolds.json       # Benchmark scaffold catalog
+│   ├── tasks.json           # Legacy reusable task fixture
+│   ├── scaffolds.json       # Legacy reusable scaffold fixture
 ├── internal/
 │   ├── api/
 │   │   └── types.go         # Request/response types
@@ -342,6 +351,8 @@ gexec-sandbox/
 │   │   └── config.go        # Configuration management with env var support
 │   ├── llm/
 │   │   └── llm.go           # Ollama client for LLM inference and model management
+│   ├── manifest/
+│   │   └── manifest.go      # Supported benchmark.yaml loader
 │   ├── metrics/
 │   │   └── metrics.go       # Request and error metrics tracking
 │   ├── middleware/
@@ -428,10 +439,10 @@ This project is being developed as a benchmark harness for economically meaningf
 - **Benchmark Harness**
   - ✅ Architected Go-based evaluation system orchestrating local inference (Ollama)
   - ✅ Scaffold-aware benchmark execution with baseline and scaffolded runs
-  - ✅ JSON task and scaffold catalogs loaded through a validation layer
+  - ✅ Root benchmark manifest loaded through a validation layer
   - ✅ Report aggregation for overall, per-family, and per-scaffold lift
   - ✅ Docker Compose orchestration for Ollama and evaluator services
-  - ✅ Environment-based configuration for model selection and host settings
+  - ✅ Manifest-based model selection with environment-based host override
   - ✅ Connection handling and availability checking for Ollama service
 
 - **Secure Multi-Language Execution Sandbox**
@@ -459,7 +470,7 @@ This project is being developed as a benchmark harness for economically meaningf
 
 - **Benchmarking Pipeline**
   - ✅ Benchmark harness infrastructure across task catalogs, scaffold catalogs, execution, grading, and reporting
-  - ✅ Task and scaffold catalog structure (`data/tasks.json`, `data/scaffolds.json`)
+  - ✅ Root benchmark manifest for supported runtime, model, task, and scaffold configuration
   - ✅ Integration of LLM code generation with sandbox execution
   - ✅ Catalog management system for workflow tasks and artifact expectations
 
@@ -478,7 +489,8 @@ This project is being developed as a benchmark harness for economically meaningf
   - 🚧 Expansion to additional economically valuable workflows such as browser, spreadsheet, document, and computer-use tasks
 
 - **Enhanced Features**
-  - 🚧 Centralized benchmark manifest for configuring models, scaffolds, tools, grading, and fixtures
+  - ✅ Centralized benchmark manifest for the currently supported benchmark surface
+  - 🚧 Expanded manifest support for tools, grading, fixtures, and additional task modes
   - 🚧 Batch evaluation mode for comparing multiple models
   - 🚧 Result caching and persistence
   - 🚧 Progress tracking and status reporting

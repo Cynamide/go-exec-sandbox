@@ -4,6 +4,6 @@ package benchmark
 type Problem = Task
 
 type TestCase struct {
-	Input          string `json:"input"`
-	ExpectedOutput string `json:"expected_output"`
+	Input          string `json:"input" yaml:"input"`
+	ExpectedOutput string `json:"expected_output" yaml:"expected_output"`
 }

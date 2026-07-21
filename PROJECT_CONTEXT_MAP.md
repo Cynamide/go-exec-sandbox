@@ -53,7 +53,7 @@
   - a wait loop for Ollama availability
   - a model pull helper
   - a model existence check helper
-- The LLM layer uses the model name from `OLLAMA_MODEL`
+- The benchmark runtime passes the manifest-selected Ollama model into the LLM client
 
 ### Benchmark layer
 
@@ -71,9 +71,8 @@
   - `Outcome`
   - `BenchmarkReport`
   - `BenchmarkService`
-- Benchmark inputs are stored in:
-  - [data/tasks.json](/Users/arjit/Documents/go-exec-sandbox/data/tasks.json)
-  - [data/scaffolds.json](/Users/arjit/Documents/go-exec-sandbox/data/scaffolds.json)
+- Benchmark runtime, model, task, and scaffold inputs are loaded from [benchmark.yaml](/Users/arjit/Documents/go-exec-sandbox/benchmark.yaml)
+- The supported manifest slice is translated by [internal/manifest/manifest.go](/Users/arjit/Documents/go-exec-sandbox/internal/manifest/manifest.go)
 - Tasks can verify:
   - stdin/stdout expectations through test cases
   - structured artifact expectations such as markdown, CSV, JSON, or text outputs
@@ -88,10 +87,10 @@
 
 ### Configuration
 
-- Configuration loading lives in [internal/config/config.go](/Users/arjit/Documents/go-exec-sandbox/internal/config/config.go)
+- Benchmark manifest loading lives in [internal/manifest/manifest.go](/Users/arjit/Documents/go-exec-sandbox/internal/manifest/manifest.go)
+- Sandbox defaults that are not yet manifest-backed live in [internal/config/config.go](/Users/arjit/Documents/go-exec-sandbox/internal/config/config.go)
 - Environment variables used by the project:
   - `OLLAMA_HOST`
-  - `OLLAMA_MODEL`
 - Defaults in code:
   - Ollama host defaults to `http://localhost:11434`
   - Default execution timeout is `60000` ms
@@ -100,8 +99,9 @@
 ## Repository Files
 
 - `cmd/evaluator/main.go` - service entrypoint
-- `data/tasks.json` - benchmark task catalog
-- `data/scaffolds.json` - benchmark scaffold catalog
+- `benchmark.yaml` - supported benchmark runtime, model, task, and scaffold config
+- `data/tasks.json` - legacy reusable benchmark task fixture
+- `data/scaffolds.json` - legacy reusable benchmark scaffold fixture
 - `internal/api/types.go` - request and response types
 - `internal/benchmark/catalog.go` - benchmark catalog loading and validation
 - `internal/benchmark/harness.go` - legacy pass-rate evaluation helper
@@ -109,6 +109,7 @@
 - `internal/benchmark/report.go` - benchmark aggregation and reporting
 - `internal/benchmark/service.go` - benchmark execution orchestration
 - `internal/config/config.go` - environment-based config loading
+- `internal/manifest/manifest.go` - supported benchmark manifest loader
 - `internal/llm/llm.go` - Ollama client helpers
 - `internal/metrics/metrics.go` - atomic request/error counters
 - `internal/middleware/rate_limiter.go` - IP-based rate limiting middleware

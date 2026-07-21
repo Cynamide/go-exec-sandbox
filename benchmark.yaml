@@ -1,0 +1,187 @@
+schema_version: 1
+
+runtime_defaults:
+  timeout_ms: 60000
+
+providers:
+  ollama_local:
+    kind: ollama
+    base_url_env: OLLAMA_HOST
+
+models:
+  qwen3_4b_local:
+    provider: ollama_local
+    model_name: qwen3:4b
+    enabled: true
+
+scaffolds:
+  baseline:
+    baseline: true
+    description: Run the task with the base prompt only.
+  tool-assisted:
+    description: Ask for a compact plan before coding and return only executable code.
+    prompt_prefix: |
+      First think through the solution briefly, then write the final code. Return only executable code.
+
+    tools:
+      - plan
+  retrieval-assisted:
+    description: Encourage checking the provided task details carefully before coding and then return only executable code.
+    prompt_prefix: |
+      Review the task details carefully, identify the required output format, and then return only executable code.
+
+    tools:
+      - task-brief
+
+tasks:
+  release-note-digest:
+    id: release-note-digest
+    title: Generate A Release Notes Digest
+    description: Read newline-delimited deployment notes from stdin in the format '<team>|<change type>|<summary>'. Produce exactly this markdown table format, with the columns 'team', 'feature changes', and 'fix changes', sorted alphabetically by team.
+    family: engineering_workflows
+    language: python
+    artifact_expectation:
+      type: markdown_report
+      format: markdown
+      description: Markdown table with columns team, feature changes, and fix changes
+    test_cases:
+      - input: |
+          api|feature|Added audit logging
+          web|fix|Fixed checkout redirect
+          api|fix|Patched token refresh
+        expected_output: |
+          | team | feature changes | fix changes |
+          | --- | --- | --- |
+          | api | 1 | 1 |
+          | web | 0 | 1 |
+      - input: |
+          search|feature|Added filters
+          api|fix|Patched token refresh
+          search|fix|Reduced latency
+        expected_output: |
+          | team | feature changes | fix changes |
+          | --- | --- | --- |
+          | api | 0 | 1 |
+          | search | 1 | 1 |
+
+  checkout-error-summary:
+    id: checkout-error-summary
+    title: Summarize Checkout Errors From Logs
+    description: Read newline-delimited checkout error messages from stdin. Produce exactly this markdown table format with the columns 'message' and 'count', sorted by descending count and then alphabetically for ties.
+    family: monitoring_workflows
+    language: python
+    artifact_expectation:
+      type: markdown_report
+      format: markdown
+      description: Markdown table with columns message and count
+    test_cases:
+      - input: |
+          Checkout failed
+          Network timeout
+          Checkout failed
+        expected_output: |
+          | message | count |
+          | --- | --- |
+          | Checkout failed | 2 |
+          | Network timeout | 1 |
+      - input: |
+          Timeout
+          Timeout
+          Auth failed
+          Auth failed
+          Auth failed
+        expected_output: |
+          | message | count |
+          | --- | --- |
+          | Auth failed | 3 |
+          | Timeout | 2 |
+
+  monthly-revenue-rollup:
+    id: monthly-revenue-rollup
+    title: Roll Up Monthly Revenue From CSV
+    description: Read CSV rows from stdin with header month,amount. Produce exactly this CSV report with the header 'month,total', one row per month, and totals in first-seen month order.
+    family: finance_workflows
+    language: python
+    artifact_expectation:
+      type: csv_report
+      format: csv
+      description: CSV with header month,total
+    test_cases:
+      - input: |
+          month,amount
+          2026-05,10
+          2026-05,15
+          2026-06,7
+        expected_output: |
+          month,total
+          2026-05,25
+          2026-06,7
+      - input: |
+          month,amount
+          2026-04,5
+          2026-03,8
+          2026-04,2
+          2026-05,1
+          2026-03,7
+        expected_output: |
+          month,total
+          2026-04,7
+          2026-03,15
+          2026-05,1
+
+  incident-owner-rollup:
+    id: incident-owner-rollup
+    title: Roll Up Incident Ownership From Terminal Output
+    description: Read newline-delimited incident records from stdin in the format '<owner> <status>'. Produce exactly this markdown incident report format with the columns 'owner', 'open incidents', and 'closed incidents', sorted alphabetically by owner.
+    family: incident_workflows
+    language: python
+    artifact_expectation:
+      type: markdown_report
+      format: markdown
+      description: Markdown table with columns owner, open incidents, and closed incidents
+    test_cases:
+      - input: |
+          alex open
+          sam closed
+          alex open
+          mira open
+        expected_output: |
+          | owner | open incidents | closed incidents |
+          | --- | --- | --- |
+          | alex | 2 | 0 |
+          | mira | 1 | 0 |
+          | sam | 0 | 1 |
+      - input: |
+          alex open
+          mira open
+          alex closed
+          zoe open
+          mira open
+          zoe closed
+        expected_output: |
+          | owner | open incidents | closed incidents |
+          | --- | --- | --- |
+          | alex | 1 | 1 |
+          | mira | 2 | 0 |
+          | zoe | 1 | 1 |
+
+  support-escalation-summary:
+    id: support-escalation-summary
+    title: Summarize Support Escalations Into Markdown
+    description: Read newline-delimited support escalation records from stdin in the format '<priority>|<team>|<status>'. Produce exactly this markdown report format with the columns 'team', 'p1 open', 'p2 open', and 'p3 open', sorted alphabetically by team.
+    family: support_workflows
+    language: python
+    artifact_expectation:
+      type: markdown_report
+      format: markdown
+      description: Markdown table with columns team, p1 open, p2 open, and p3 open escalations
+      input: |
+        p1|platform|open
+        p2|billing|closed
+        p1|billing|open
+      expected_output: |
+        | team | p1 open | p2 open | p3 open |
+        | --- | --- | --- | --- |
+        | billing | 1 | 0 | 0 |
+        | platform | 1 | 0 | 0 |
+    test_cases: []

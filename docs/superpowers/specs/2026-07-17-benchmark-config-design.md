@@ -99,6 +99,12 @@ benchmark:
     contamination_control:
       enabled: true
       strategy: canary_and_private_splits
+      refresh_policy:
+        cadence: monthly
+        freshness_window_days: 45
+        rotate_public_samples: true
+        private_holdout_fraction: 0.4
+        source_timestamp_field: cases[*].metadata.created_at
     leaderboard:
       publish_model_outputs: optional
       publish_judgments: true
@@ -131,6 +137,12 @@ runtime_defaults:
     generated_file: true
     generated_directory: true
     git_diff: true
+    terminal_session: true
+    notebook_state: true
+    spreadsheet_state: true
+    attachments: true
+    conversation_transcript: true
+    tool_errors: true
     trace_events: true
     model_outputs: true
   normalization:
@@ -186,6 +198,7 @@ models:
       file_editing: true
       browser: true
       multimodal: true
+      visual_reasoning: true
       judge: true
   local_qwen_endpoint:
     provider: local_openai_compatible
@@ -332,6 +345,9 @@ tools:
     side_effects: external_navigation
     process_signals:
       - browser_navigation
+    reliability_profile:
+      mode: deterministic
+      retry_policy: none
 
   shell_exec:
     kind: builtin
@@ -359,6 +375,9 @@ tools:
     side_effects: workspace_mutation
     process_signals:
       - command_execution
+    reliability_profile:
+      mode: deterministic
+      retry_policy: none
 
 scaffolds:
   baseline:
@@ -500,6 +519,14 @@ fixtures:
     kind: browser_fixture
     path: data/browser/checkout-timeout.json
     format: json
+  chart_reasoning_cases:
+    kind: multimodal_fixture
+    path: data/vision/chart-reasoning.json
+    format: json
+  pairwise_preference_rubric:
+    kind: preference_rubric
+    path: data/rubrics/pairwise-deliverable-preference.yaml
+    format: yaml
 
 tasks:
   release_note_digest:
@@ -768,6 +795,65 @@ tasks:
           - type: minimum_event_count
             event: browser.action_taken
             at_least: 1
+
+  chart_anomaly_explanation:
+    id: chart-anomaly-explanation
+    version: v1
+    split: gated_test
+    task_mode: visual_reasoning
+    title: Explain A Chart Anomaly
+    family: analysis_workflows
+    language: none
+    description: Inspect a chart image and produce a concise explanation of the anomaly and likely cause.
+    tags:
+      - multimodal
+      - chart_reasoning
+    models:
+      include:
+        - gpt_5_4_mini_medium
+    scaffolds:
+      include:
+        - baseline
+    fewshot:
+      num_examples: 0
+      sampler: none
+    inputs:
+      sources:
+        - kind: multimodal_fixture
+          fixture: chart_reasoning_cases
+          field: cases[*].input
+      repo_seed: null
+      attachments:
+        - kind: image
+          path_from: cases[*].image_path
+          media_type: image/png
+      browser_start_state: null
+      environment:
+        required: []
+        optional: []
+    outputs:
+      primary:
+        channel: stdout
+        format: markdown
+        media_type: text/markdown
+      side_effects: []
+    grading:
+      outcome:
+        enabled: true
+        preferred_score: preference_win_rate
+        judge_model_role: judge
+        metrics:
+          - name: preference_win_rate
+            aggregation: mean
+            higher_is_better: true
+        checks:
+          - type: pairwise_preference
+            rubric: pairwise_preference_rubric
+            baseline_output_from: cases[*].baseline_answer
+            candidate_output_from: stdout
+            comparison_unit: sample
+      process:
+        enabled: false
 ```
 
 ## Field Reference
@@ -818,6 +904,23 @@ Fields:
 
 These limits are directly motivated by agent-eval systems that need bounded autonomy rather than single-shot text scoring.
 
+Recommended `capture` fields:
+
+- `stdout`
+- `stderr`
+- `exit_code`
+- `generated_file`
+- `generated_directory`
+- `git_diff`
+- `terminal_session`
+- `notebook_state`
+- `spreadsheet_state`
+- `attachments`
+- `conversation_transcript`
+- `tool_errors`
+- `trace_events`
+- `model_outputs`
+
 Inheritance rules:
 
 - `runtime_defaults` apply to every task unless that task overrides the field explicitly.
@@ -831,6 +934,11 @@ Recommended `task_mode` values:
 - `repo_patch`
 - `browser_agent`
 - `api_agent`
+- `terminal_agent`
+- `notebook_agent`
+- `spreadsheet_agent`
+- `visual_reasoning`
+- `conversation_agent`
 - `text_only`
 
 `task_mode` is not optional in the effective task configuration. A loader should compute it from the task value or the runtime default before selecting executors, tools, or graders.
@@ -893,6 +1001,11 @@ Useful `capabilities` flags:
 - `file_editing`
 - `browser`
 - `multimodal`
+- `visual_reasoning`
+- `terminal_session`
+- `spreadsheet`
+- `notebook`
+- `conversation`
 - `structured_output`
 - `judge`
 
@@ -991,6 +1104,7 @@ Fields:
 - `outputs.emits_events`: trace events emitted by successful use
 - `side_effects`: `none`, `read_only`, `workspace_mutation`, `external_navigation`, `network_call`
 - `process_signals`: reusable process-grade labels
+- `reliability_profile`: deterministic or fault-injected behavior for reliability and recovery benchmarks
 
 #### Tool implementation contract
 
@@ -1023,6 +1137,23 @@ Reference semantics:
 - `tasks[*].grading.process.checks[*].allowed_tools`
   must all reference these keys exactly
 
+#### Tool reliability profiles
+
+Tool reliability profiles let the manifest represent benchmarks where the tool environment is unreliable or adversarial.
+
+Fields:
+
+- `mode`: reliability behavior, such as `deterministic`, `stochastic`, `recorded_failures`, or `fault_injected`
+- `retry_policy`: retry behavior, such as `none`, `bounded`, or `harness_default`
+- `failure_fixture`: optional fixture key with scripted or sampled tool failures
+- `retryable_errors`: optional list of error classes that an agent may recover from
+
+Rules:
+
+- `failure_fixture` must reference a fixture with `kind: tool_failure_fixture`
+- tools without `reliability_profile` default to `mode: deterministic` and `retry_policy: none`
+- process grading may use `tool_recovery_after_failure` only when at least one selected tool has a non-deterministic or fault-injected reliability profile
+
 ### `scaffolds`
 
 Prompting and tool-access strategies applied to tasks.
@@ -1054,6 +1185,11 @@ The `input_contract` section should support these categories:
 - `repo_context`
 - `attachments`
 - `browser_start_state`
+- `terminal_session`
+- `notebook_state`
+- `spreadsheet_state`
+- `multimodal_inputs`
+- `conversation_state`
 - `environment_variables`
 
 These are categories, not concrete payloads. Concrete payloads are provided by the task under `inputs`.
@@ -1064,6 +1200,13 @@ Recommended values for each category:
 - `optional`
 - `forbidden`
 
+Omission semantics:
+
+- omitted input categories default to `forbidden`
+- a task may provide an input category only when at least one selected scaffold marks it `required` or `optional`
+- visual attachments are represented through `attachments`; `multimodal_inputs` is for non-file visual payloads such as inline image arrays or model-native multimodal message parts
+- `conversation_state` is for simulated users, customer-service environments, or multi-turn domain actors
+
 Sample:
 
 ```yaml
@@ -1073,6 +1216,11 @@ input_contract:
   repo_context: required
   attachments: forbidden
   browser_start_state: optional
+  terminal_session: forbidden
+  notebook_state: forbidden
+  spreadsheet_state: forbidden
+  multimodal_inputs: forbidden
+  conversation_state: forbidden
   environment_variables: optional
 ```
 
@@ -1089,8 +1237,15 @@ Allowed `kind` values in this design:
 
 - `task_cases`
 - `rubric`
+- `preference_rubric`
 - `repo_seed`
 - `browser_fixture`
+- `multimodal_fixture`
+- `notebook_fixture`
+- `spreadsheet_fixture`
+- `terminal_fixture`
+- `conversation_fixture`
+- `tool_failure_fixture`
 - `attachment`
 - `expected_files`
 - `golden_patch`
@@ -1192,6 +1347,16 @@ Recommended values:
   - model interacts with browser state or browser tools
 - `api_agent`
   - model interacts with APIs or HTTP tools as the main task path
+- `terminal_agent`
+  - model works inside a persistent shell session across multiple commands
+- `notebook_agent`
+  - model works through notebook cells, outputs, and execution state
+- `spreadsheet_agent`
+  - model edits or reasons over spreadsheet workbooks as the primary task surface
+- `visual_reasoning`
+  - model reasons over images, charts, screenshots, diagrams, or other visual inputs
+- `conversation_agent`
+  - model interacts with a simulated user, domain actor, or multi-turn service environment
 - `text_only`
   - model returns natural-language or structured text without executor-side action
 
@@ -1200,6 +1365,11 @@ This field should drive executor selection and validation. For example:
 - `browser_agent` should not require a runnable source language
 - `repo_patch` should enable diff and file-mutation capture
 - `code_exec` should require a concrete executable language
+- `terminal_agent` should allocate a persistent session and capture command history
+- `notebook_agent` should capture cell inputs, cell outputs, and generated files
+- `spreadsheet_agent` should capture workbook diffs or normalized workbook outputs
+- `visual_reasoning` should require a multimodal-capable model and visual inputs
+- `conversation_agent` should capture turn-by-turn conversation state and final user-goal status
 
 ### `tasks[*].language`
 
@@ -1214,7 +1384,7 @@ Compatibility guidance:
 
 - `code_exec` should use a real executable language
 - `repo_patch` may use an executable language or `none`, depending on whether code generation or patch emission is primary
-- `browser_agent`, `api_agent`, and `text_only` may use `none`
+- `browser_agent`, `api_agent`, `terminal_agent`, `notebook_agent`, `spreadsheet_agent`, `visual_reasoning`, `conversation_agent`, and `text_only` may use `none`
 
 Omission semantics:
 
@@ -1232,12 +1402,18 @@ Allowed input source kinds in this design:
 - `browser_fixture`
 - `api_fixture`
 - `db_fixture`
+- `multimodal_fixture`
+- `notebook_fixture`
+- `spreadsheet_fixture`
+- `terminal_fixture`
+- `conversation_fixture`
 
 `field` uses a restricted fixture path syntax:
 
 - `cases[*].input`
 - `cases[*].expected_output`
 - `records[*].payload`
+- `cases[*].metadata.created_at`
 
 The loader should support only dot access plus `[*]`. Avoid full JSONPath complexity.
 
@@ -1245,6 +1421,25 @@ Omission semantics:
 
 - `field` is required when a fixture contains more than one logical payload slot
 - `field` may be omitted only when the fixture kind has exactly one canonical payload shape
+
+### `tasks[*].inputs.attachments[*]`
+
+Attachments are files or media payloads delivered alongside task text or fixture input.
+
+Fields:
+
+- `kind`: attachment class, such as `image`, `pdf`, `document`, `spreadsheet`, `presentation`, `archive`, or `text_file`
+- `path`: static path to the attachment payload
+- `path_from`: fixture field path that resolves to the attachment payload path for each case
+- `media_type`: MIME type used by the harness and model adapter
+- `description`: optional human-readable purpose
+
+Rules:
+
+- exactly one of `path` or `path_from` should be present
+- `path_from` uses the same restricted fixture path syntax as input source `field`
+- every attachment path should resolve under a declared fixture root or benchmark data directory
+- visual reasoning tasks should use `kind: image` or another visual attachment kind unless the visual payload is embedded directly in a `multimodal_fixture`
 
 ### `tasks[*].outputs.primary.channel`
 
@@ -1261,6 +1456,10 @@ Allowed primary output channels in this design:
 - `http_response`
 - `exec_result`
 - `trace`
+- `terminal_session`
+- `notebook_state`
+- `spreadsheet_state`
+- `conversation_transcript`
 
 Channel-specific companion fields:
 
@@ -1273,6 +1472,18 @@ Channel-specific companion fields:
   - `status_field`
   - `body_field`
 - `browser_state`
+  - `state_projection`
+- `terminal_session`
+  - `session_id`
+  - `history_projection`
+- `notebook_state`
+  - `notebook_path`
+  - `cell_projection`
+- `spreadsheet_state`
+  - `workbook_path`
+  - `sheet_projection`
+- `conversation_transcript`
+  - `turn_projection`
   - `state_projection`
 
 Sample channel snippets:
@@ -1385,6 +1596,12 @@ Outcome grading types covered by this design:
 - `tests_pass`
 - `http_response_match`
 - `browser_state_match`
+- `terminal_session_match`
+- `notebook_state_match`
+- `spreadsheet_state_match`
+- `visual_answer_match`
+- `pairwise_preference`
+- `conversation_goal_match`
 
 Current repo code directly implements only:
 
@@ -1397,6 +1614,25 @@ Recommended interpretation:
 
 - `format` describes the comparison family
 - `media_type` describes the concrete artifact encoding
+
+`pairwise_preference` check fields:
+
+- `rubric`: fixture key for a `preference_rubric`
+- `comparison_unit`: scoring granularity, such as `sample`, `task`, or `artifact`
+- `candidate_output_from`: output channel or fixture field for the evaluated run
+- `baseline_output_from`: output channel or fixture field for the baseline comparison
+- `reference_output_from`: optional reference or expert output when no baseline run exists
+- `baseline_fixture`: optional fixture key for `baseline_output_from`
+- `reference_fixture`: optional fixture key for `reference_output_from`
+- `judge_model_role`: optional override when the check needs a specific judge role
+
+Rules:
+
+- `rubric` must reference a fixture with `kind: preference_rubric`
+- exactly one of `baseline_output_from` or `reference_output_from` should be present
+- unqualified fixture paths in `baseline_output_from` or `reference_output_from` resolve against the task's primary source fixture
+- if a task has multiple source fixtures, `baseline_fixture` or `reference_fixture` must be declared when the source path is not an output channel
+- pairwise preference grading should report at least one preference metric such as `preference_win_rate`
 
 ### `tasks[*].grading.outcome.metrics`
 
@@ -1420,6 +1656,14 @@ Recommended `aggregation` values:
 
 If a metric depends on a judge model rather than deterministic checks alone, the outcome section should declare `judge_model_role`.
 
+Recommended metric names for preference and refreshed benchmark runs:
+
+- `preference_win_rate`
+- `pairwise_margin`
+- `human_accept_rate`
+- `refreshed_split_score`
+- `private_holdout_score`
+
 ### `tasks[*].grading.process.checks[*].type`
 
 Process grading types covered by this design:
@@ -1434,10 +1678,19 @@ Process grading types covered by this design:
 - `rubric`
 - `state_transition_match`
 - `recovery_after_failure`
+- `trajectory_score`
+- `step_annotation_match`
+- `tool_recovery_after_failure`
+- `dense_reward`
 
 The repo does not currently implement process scoring; this section is schema design for the next feature wave.
 
 If a process rubric or model-judged score is used, the task should declare `judge_model_role`.
+
+Process checks should support both sparse and dense scoring:
+
+- sparse checks score whether key events occurred, such as required tool calls or successful recovery
+- dense checks score intermediate trajectory quality, such as step annotations, partial-credit state transitions, or verifier rewards
 
 ### `tasks[*].inputs.environment`
 
@@ -1457,15 +1710,34 @@ Fields:
 - `benchmark_type`: such as `official`, `experimental`, `internal`
 - `contamination_control.enabled`
 - `contamination_control.strategy`
+- `contamination_control.refresh_policy`
 - `leaderboard.publish_model_outputs`
 - `leaderboard.publish_judgments`
 - `leaderboard.allow_private_test_answers`
+
+`refresh_policy` makes live and rolling benchmark behavior explicit.
+
+Fields:
+
+- `cadence`: how often the benchmark refreshes task material
+- `freshness_window_days`: maximum age of newly released task sources
+- `rotate_public_samples`: whether public examples rotate over time
+- `private_holdout_fraction`: approximate share of samples held private for evaluation
+- `source_timestamp_field`: fixture field used to verify source freshness
 
 Recommended `publish_model_outputs` values:
 
 - `never`
 - `optional`
 - `required`
+
+Recommended `cadence` values:
+
+- `none`
+- `weekly`
+- `monthly`
+- `quarterly`
+- `continuous`
 
 ### `runtime_defaults.approval_policy`
 
@@ -1604,7 +1876,14 @@ The schema is intended to cover these benchmark result shapes:
 - Browser-observed state
 - Browser screenshots
 - HTTP response payloads
+- Persistent terminal sessions
+- Notebook state and generated notebook artifacts
+- Spreadsheet workbook state
+- Conversation transcripts and simulated user state
+- Multimodal visual inputs such as screenshots, charts, diagrams, and document images
 - Execution trace and tool events
+- Tool failure and recovery events
+- Pairwise preference judgments over generated deliverables
 
 ## Process Evidence Model
 
@@ -1650,6 +1929,7 @@ These are not config files. They are benchmark data payloads.
       "input": "api|feature|Added audit logging\nweb|fix|Fixed checkout redirect\n",
       "expected_output": "| team | feature changes | fix changes |\n| --- | --- | --- |\n| api | 1 | 0 |\n| web | 0 | 1 |",
       "metadata": {
+        "created_at": "2026-07-20T12:00:00Z",
         "difficulty": "easy"
       }
     }
@@ -1667,6 +1947,50 @@ criteria:
   - id: repo_inspection
     description: The model inspects relevant repository context before modifying files.
     required: true
+```
+
+### Preference rubric fixture
+
+```yaml
+comparison_unit: sample
+instructions: Prefer the candidate that better satisfies the user task while preserving factual accuracy.
+criteria:
+  - id: correctness
+    description: The answer identifies the right finding or deliverable content.
+    weight: 0.5
+  - id: evidence
+    description: The answer cites the relevant visual, file, trace, or task evidence.
+    weight: 0.3
+  - id: usability
+    description: The answer is concise and directly usable by the target worker.
+    weight: 0.2
+allowed_outcomes:
+  - candidate_wins
+  - baseline_wins
+  - tie
+```
+
+### Multimodal fixture
+
+```json
+{
+  "cases": [
+    {
+      "case_id": "chart-001",
+      "input": "Explain the anomaly in the attached chart.",
+      "image_path": "data/vision/chart-001.png",
+      "baseline_answer": "The chart shows a spike.",
+      "expected_findings": [
+        "conversion drops after deployment",
+        "mobile traffic is disproportionately affected"
+      ],
+      "metadata": {
+        "created_at": "2026-07-20T12:00:00Z",
+        "visual_type": "line_chart"
+      }
+    }
+  ]
+}
 ```
 
 ### Browser fixture
@@ -1708,8 +2032,28 @@ The manifest should be rejected if any of these fail:
 - every task has an effective `task_mode`
 - every `task_mode: code_exec` task uses a concrete executable `language`
 - every `task_mode: browser_agent` task uses a browser-capable scaffold
+- every `task_mode: terminal_agent` task enables `capture.terminal_session`
+- every `task_mode: notebook_agent` task declares a notebook fixture or notebook output state
+- every `task_mode: spreadsheet_agent` task declares a spreadsheet fixture or spreadsheet output state
+- every `task_mode: visual_reasoning` task has at least one visual attachment or multimodal fixture
+- every `task_mode: conversation_agent` task declares a conversation fixture or conversation state
+- every visual reasoning task selects only models with `capabilities.multimodal: true` or `capabilities.visual_reasoning: true`
+- every terminal task selects a scaffold that permits terminal session inputs or shell tools
+- every notebook task selects a scaffold that permits notebook state or notebook tools
+- every spreadsheet task selects a scaffold that permits spreadsheet state or spreadsheet tools
+- every conversation task selects a scaffold that permits conversation state or conversation tools
+- every task attachment defines exactly one of `path` or `path_from`
+- every attachment with `path_from` points at an existing fixture field
 - every process check type is valid when `process.enabled: true`
 - every declared `judge_model_role` resolves through `default_model_roles` to an existing model with `capabilities.judge: true`
+- every `pairwise_preference` check declares a rubric, comparison unit, candidate output, and exactly one baseline or reference output source
+- every `pairwise_preference.rubric` references a fixture with `kind: preference_rubric`
+- every pairwise check that reads a fixture path from a task with multiple source fixtures declares the relevant `baseline_fixture` or `reference_fixture`
+- every live or rolling benchmark with `refresh_policy.cadence` other than `none` declares a source timestamp field or equivalent freshness metadata
+- every dense process check declares enough trace evidence to reconstruct intermediate steps
+- every tool with `reliability_profile.failure_fixture` references a fixture with `kind: tool_failure_fixture`
+- every process check of type `tool_recovery_after_failure` selects at least one tool with a non-deterministic or fault-injected reliability profile
+- every selected tool with non-deterministic, recorded-failure, or fault-injected behavior enables `capture.tool_errors`
 - every `fewshot.num_examples > 0` task defines enough information to source the examples
 - every model either resolves through a provider contract or defines a complete direct endpoint override
 - every `kind: custom_http` provider defines both request and response transport semantics
@@ -1720,6 +2064,10 @@ The manifest should be rejected if any of these fail:
 - every file-producing output defines `media_type`
 - every tool event named in process grading can actually be emitted by the selected scaffold tools or runtime capture
 - any task using `git_diff` output also enables `capture.git_diff`
+- any task using `notebook_state` output also enables `capture.notebook_state`
+- any task using `spreadsheet_state` output also enables `capture.spreadsheet_state`
+- any task using `conversation_transcript` output also enables `capture.conversation_transcript`
+- any task using scored attachments also enables `capture.attachments`
 - any task using browser outputs includes `browser_start_state` or a browser fixture
 - any selected task-model pair satisfies declared capability requirements
 - no secret value is stored inline in the manifest
@@ -1743,6 +2091,12 @@ Fields designed here but not implemented yet:
 - file, directory, git diff, browser, and HTTP outcome grading
 - fixture registry
 - validation of tool/event compatibility
+- pairwise preference grading
+- live benchmark refresh policy enforcement
+- visual reasoning, terminal session, notebook, and spreadsheet task runners
+- dense trajectory scoring and step-level process annotations
+- conversation-agent task runners and simulated user state
+- tool reliability profiles and fault-injection fixtures
 
 ## External Benchmark Audit
 
@@ -1880,6 +2234,39 @@ Manifest impacts:
 Primary source:
 
 - GAIA dataset card and leaderboard submission format
+
+### 2026 Agentic Benchmark Coverage Pass
+
+Relevant patterns:
+
+- pairwise preference grading for professional deliverables
+- rolling release policy and freshness windows for live benchmarks
+- visual-reasoning tasks over charts, screenshots, diagrams, and document images
+- persistent terminal sessions for long-horizon command-line work
+- notebook and spreadsheet task surfaces for scientific, data, and knowledge-work benchmarks
+- dense trajectory scoring for process quality beyond pass/fail events
+- unreliable tool environments and recovery scoring
+- multi-turn user or domain-actor simulations
+
+Manifest impacts:
+
+- add `pairwise_preference` as an outcome check type
+- add preference metrics such as `preference_win_rate` and `pairwise_margin`
+- add `refresh_policy` under contamination control
+- add `visual_reasoning`, `terminal_agent`, `notebook_agent`, and `spreadsheet_agent` task modes
+- add fixture kinds and output channels for multimodal, terminal, notebook, and spreadsheet tasks
+- add dense process checks such as `trajectory_score`, `step_annotation_match`, and `dense_reward`
+- add `conversation_agent`, `conversation_fixture`, and `conversation_transcript`
+- add tool `reliability_profile` blocks and `tool_failure_fixture`
+
+Primary sources:
+
+- GDPval grading documentation
+- LiveBench documentation and datasheet
+- SWE-bench Pro documentation
+- BrowseComp benchmark description
+- OSWorld benchmark paper
+- MLE-bench benchmark description
 
 ## Design Review Log
 
@@ -2037,6 +2424,23 @@ Resolution:
 - Added provider and model support for direct `endpoint_url`, `openai_compatible`, `custom_http`, model-level auth overrides, and request/response mappings.
 - Added validation rules so endpoint-based model entries are not underspecified.
 
+### Pass 16
+
+Issue:
+
+- The manifest covered the main scaffold-aware benchmark shape but did not make several active benchmark modes first-class: pairwise preference grading, live/rolling releases, visual reasoning, persistent terminal sessions, notebook workflows, spreadsheet workflows, conversation-agent tasks, unreliable tool environments, and dense process scoring.
+
+Resolution:
+
+- Added `refresh_policy` for live benchmark rotation and freshness metadata.
+- Added `visual_reasoning`, `terminal_agent`, `notebook_agent`, and `spreadsheet_agent` task modes.
+- Added fixture kinds and output channels for multimodal, terminal, notebook, and spreadsheet tasks.
+- Added `pairwise_preference` outcome grading plus preference-oriented metrics.
+- Added `conversation_agent`, `conversation_fixture`, and `conversation_transcript` for simulated user and multi-turn domain tasks.
+- Added tool `reliability_profile` blocks and `tool_failure_fixture` for unreliable tool environments.
+- Added dense process grading checks for trajectory and step-level scoring.
+- Added validation rules for the new task modes, preference checks, rolling release metadata, and dense process evidence.
+
 ## Remaining Open Questions
 
 These are not schema blockers, but they affect implementation order:
@@ -2044,6 +2448,9 @@ These are not schema blockers, but they affect implementation order:
 - Whether `artifact_yaml` and `artifact_html` should be implemented before or after file-based grading.
 - Whether rubric grading is deterministic rules only, model-judged, or both.
 - Whether `generated_directory` grading needs checksum-based matching, manifest-based matching, or semantic file-by-file checks.
+- Whether office artifacts should stay represented as generic generated files or get document-specific normalized comparison rules.
+- Whether terminal and notebook sessions should share one episode abstraction or stay separate runtimes.
+- Whether conversation-agent tasks should use a deterministic scripted user, a model-based user simulator, or both.
 
 My recommendation:
 
@@ -2055,6 +2462,9 @@ My recommendation:
   5. process trace capture
   6. process grading
   7. browser and repo-mutation grading
+  8. pairwise preference grading
+  9. visual, terminal, notebook, and spreadsheet task runners
+  10. conversation-agent runners and tool reliability profiles
 
 ## Recommendation
 

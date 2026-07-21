@@ -15,6 +15,7 @@ RUN apk --no-cache add ca-certificates docker-cli
 WORKDIR /app
 
 COPY --from=builder /app/evaluator .
+COPY --from=builder /app/benchmark.yaml .
 
 EXPOSE 8080
 
