@@ -540,9 +540,11 @@ func TestNewAdapterValidatesBearerAuthEnvWithoutManifestResolution(t *testing.T)
 
 func TestNewAdapterRejectsMalformedCanonicalAuth(t *testing.T) {
 	for name, auth := range map[string]AuthConfig{
-		"none with env":      {Type: "none", Env: "UNUSED_API_KEY"},
-		"none with header":   {Type: "none", Header: "Authorization"},
-		"bearer with header": {Type: "bearer_env", Env: "REMOTE_MODEL_API_KEY", Header: "X-API-Key"},
+		"blank type with env":    {Env: "UNUSED_API_KEY"},
+		"blank type with header": {Header: "Authorization"},
+		"none with env":          {Type: "none", Env: "UNUSED_API_KEY"},
+		"none with header":       {Type: "none", Header: "Authorization"},
+		"bearer with header":     {Type: "bearer_env", Env: "REMOTE_MODEL_API_KEY", Header: "X-API-Key"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := New(Config{

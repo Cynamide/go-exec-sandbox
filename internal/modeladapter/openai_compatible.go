@@ -290,6 +290,9 @@ func validateOpenAICompatibleConfig(cfg Config) error {
 func normalizeOpenAICompatibleAuth(cfg Config) (Config, error) {
 	switch cfg.Auth.Type {
 	case "":
+		if cfg.Auth.Env != "" || cfg.Auth.Header != "" {
+			return Config{}, fmt.Errorf("model adapter config %q auth requires type when env or header is set", cfg.ID)
+		}
 		return cfg, nil
 	case "none":
 		if cfg.Auth.Env != "" || cfg.Auth.Header != "" {

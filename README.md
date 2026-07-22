@@ -502,7 +502,6 @@ This project is being developed as a benchmark harness for economically meaningf
 
 ### 🎯 Future Enhancements
 
-- Multi-model comparison support
 - Distributed evaluation setup
 - Additional provider backends and endpoint types
 - Performance profiling and optimization
