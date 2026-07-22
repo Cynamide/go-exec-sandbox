@@ -10,7 +10,8 @@
 
 ## Global Constraints
 
-- Existing minimal manifests remain loadable until the root `benchmark` block is made required.
+- Prerequisites: run-persistence-interchange for export gates; dataset-access-visibility for answer visibility policy.
+- Minimal manifests remain loadable until the root `benchmark` block is made required.
 - Benchmark IDs must be stable lowercase identifiers safe for filenames.
 - Release policy must be available before public export.
 - Contamination controls must validate private and gated split usage.
@@ -133,7 +134,7 @@ Expected: FAIL because metadata report helper is undefined.
 
 - [ ] **Step 3: Implement report metadata**
 
-Add metadata to reports while preserving existing `BuildBenchmarkReport` behavior through a compatibility wrapper.
+Add metadata to reports through an additive report-construction API. Keep `BuildBenchmarkReport` available for callers that only provide tasks and runs.
 
 - [ ] **Step 4: Run tests**
 

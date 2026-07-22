@@ -10,10 +10,11 @@
 
 ## Global Constraints
 
+- Prerequisites: none.
 - Baseline scaffolds cannot require or call tools.
 - Tool IDs must resolve to top-level tool definitions.
 - Secret values are never stored in manifest files.
-- Existing prompt-prefix-only scaffolds remain valid.
+- Prompt-prefix-only scaffolds remain valid.
 
 ---
 

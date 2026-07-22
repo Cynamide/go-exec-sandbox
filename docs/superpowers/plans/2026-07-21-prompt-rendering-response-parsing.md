@@ -10,7 +10,8 @@
 
 ## Global Constraints
 
-- The current code-generation prompt remains available as the default renderer.
+- Prerequisites: fixtures-inputs for materialized samples; task-selection-fewshot for selected few-shot examples.
+- Code-generation tasks use a default renderer when no renderer is configured.
 - Rendered prompts and parsed outputs must be reportable.
 - Template references to missing sample fields must fail before execution.
 - Parsers must be deterministic and named.
@@ -53,7 +54,7 @@ Expected: FAIL because `internal/prompting` does not exist.
 
 - [ ] **Step 3: Implement renderer**
 
-Move prompt construction out of `llm.chatRequest` into `CodeRenderer`. Keep `llm.Client.GenerateCode` using `CodeRenderer` until runners are migrated.
+Implement prompt construction in `CodeRenderer` and have `llm.Client.GenerateCode` call the renderer before creating the chat request.
 
 - [ ] **Step 4: Run tests**
 

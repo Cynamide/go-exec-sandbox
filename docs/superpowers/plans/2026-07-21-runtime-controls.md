@@ -4,13 +4,14 @@
 
 **Goal:** Make runtime defaults in `benchmark.yaml` control execution attempts, concurrency, epochs, fail behavior, capture, normalization, sandbox profile, and default task properties.
 
-**Architecture:** Introduce `internal/benchmark/runtime_config.go` as the runtime model used by manifest loading and benchmark service execution. Keep `config.Config` for sandbox compatibility until call sites are migrated. Apply concurrency and epochs in the service layer, and keep deterministic report ordering.
+**Architecture:** Introduce `internal/benchmark/runtime_config.go` as the runtime model used by manifest loading and benchmark service execution. Feed sandbox-specific runtime values into `config.Config` at sandbox call sites. Apply concurrency and epochs in the service layer, and keep deterministic report ordering.
 
 **Tech Stack:** Go, context cancellation, `sync/errgroup` or bounded worker channels, table-driven tests.
 
 ## Global Constraints
 
-- Current manifest behavior remains sequential, single-epoch, one attempt.
+- Prerequisites: none.
+- Omitted runtime controls default to sequential, single-epoch, one-attempt execution.
 - Runtime values must be validated before benchmark execution.
 - Concurrency must not change report ordering.
 - Runtime normalization must happen before outcome grading.
@@ -26,8 +27,8 @@
 - Modify: `internal/manifest/manifest_test.go`
 
 **Interfaces:**
-- Produces: `benchmark.RuntimeConfig`, `benchmark.FailPolicy`, `benchmark.CaptureConfig`, `benchmark.NormalizationConfig`
-- Consumes: current manifest `runtime_defaults`
+- Produces: `benchmark.RuntimeConfig`, `benchmark.FailPolicy`, `benchmark.CaptureConfig`, `benchmark.NormalizationConfig`, `benchmark.SampleLimits`
+- Consumes: manifest `runtime_defaults`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -47,7 +48,7 @@ Expected: FAIL because `DefaultRuntimeConfig` is undefined.
 
 - [ ] **Step 3: Implement runtime config and validation**
 
-Add defaults for timeout, max attempts, concurrency, epochs, random seed, approval policy, fail policy, capture, and normalization.
+Add defaults for timeout, max attempts, concurrency, epochs, random seed, working directory, sandbox profile, approval policy, fail policy, sample limits, capture, and normalization.
 
 - [ ] **Step 4: Run tests**
 
@@ -108,7 +109,52 @@ git add internal/manifest internal/benchmark
 git commit -m "Apply runtime defaults to tasks"
 ```
 
-### Task 3: Execute Epochs And Attempts
+### Task 3: Enforce Approval, Sandbox, And Sample Limits
+
+**Files:**
+- Modify: `internal/benchmark/runtime_config.go`
+- Modify: `internal/benchmark/runtime_config_test.go`
+- Modify: `internal/manifest/manifest.go`
+- Modify: `internal/manifest/manifest_test.go`
+- Modify: `internal/config/config.go`
+
+**Interfaces:**
+- Consumes: `benchmark.RuntimeConfig`
+- Produces: `RuntimeConfig.RequireApproval(action string) error`, `RuntimeConfig.ValidateSampleLimits(sample SampleBudget) error`
+
+- [ ] **Step 1: Write the failing test**
+
+```go
+func TestRuntimeRejectsExternalActionWhenApprovalPolicyDenies(t *testing.T) {
+	cfg := benchmark.RuntimeConfig{ApprovalPolicy: "never", SandboxProfile: "docker", SampleLimits: benchmark.SampleLimits{MaxToolCalls: 2}}
+	if err := cfg.RequireApproval("external_network"); err == nil {
+		t.Fatal("RequireApproval() error = nil, want denied external action")
+	}
+}
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/benchmark`
+Expected: FAIL because runtime approval and sample-limit enforcement are undefined.
+
+- [ ] **Step 3: Implement runtime enforcement helpers**
+
+Validate `working_directory`, `sandbox_profile`, and `approval_policy`. Add sample limits for tool calls, messages, tokens, wall time, and estimated cost. Keep enforcement helpers side-effect free so runners and solvers can call them before external or destructive actions.
+
+- [ ] **Step 4: Run tests**
+
+Run: `GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/benchmark ./internal/manifest ./internal/config`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add internal/benchmark internal/manifest internal/config
+git commit -m "Enforce runtime safety controls"
+```
+
+### Task 4: Execute Epochs And Attempts
 
 **Files:**
 - Modify: `internal/benchmark/model.go`
@@ -157,7 +203,7 @@ git add internal/benchmark
 git commit -m "Add runtime epochs and attempts"
 ```
 
-### Task 4: Add Bounded Concurrency
+### Task 5: Add Bounded Concurrency
 
 **Files:**
 - Modify: `internal/benchmark/service.go`
@@ -170,7 +216,7 @@ git commit -m "Add runtime epochs and attempts"
 - [ ] **Step 1: Write the failing test**
 
 ```go
-func TestServicePreservesRunOrderWithConcurrency(t *testing.T) {
+func TestServiceReturnsDeterministicRunOrderWithConcurrency(t *testing.T) {
 	service := benchmarkServiceWithRuntime(benchmark.RuntimeConfig{Concurrency: 4, Epochs: 1, MaxAttempts: 1})
 	report, err := service.Run(context.Background())
 	if err != nil {
@@ -201,4 +247,51 @@ Expected: PASS.
 ```bash
 git add internal/benchmark
 git commit -m "Add deterministic runtime concurrency"
+```
+
+### Task 6: Apply Fail Policy Across Run Levels
+
+**Files:**
+- Modify: `internal/benchmark/service.go`
+- Modify: `internal/benchmark/service_test.go`
+- Modify: `internal/benchmark/report.go`
+
+**Interfaces:**
+- Consumes: `benchmark.FailPolicy`
+- Produces: fail-policy decisions at sample, task, model, and run levels
+
+- [ ] **Step 1: Write the failing test**
+
+```go
+func TestFailPolicyStopsTaskAfterFirstSampleFailure(t *testing.T) {
+	service := benchmarkServiceWithRuntime(benchmark.RuntimeConfig{FailPolicy: benchmark.FailPolicy{OnSampleFailure: "stop_task"}, MaxAttempts: 1, Epochs: 1})
+	report, err := service.Run(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := countRunsForTask(report.Runs, "task-with-first-sample-failure"); got != 1 {
+		t.Fatalf("runs for failed task = %d, want 1", got)
+	}
+}
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/benchmark`
+Expected: FAIL because fail policy is parsed but not enforced across run levels.
+
+- [ ] **Step 3: Implement fail-policy decisions**
+
+Apply configured actions for sample failure, task failure, model failure, and run failure. Record skipped work in report metadata so aggregate denominators remain explainable.
+
+- [ ] **Step 4: Run tests**
+
+Run: `GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/benchmark`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add internal/benchmark
+git commit -m "Apply runtime fail policy"
 ```

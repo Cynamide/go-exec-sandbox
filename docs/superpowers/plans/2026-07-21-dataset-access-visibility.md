@@ -10,6 +10,7 @@
 
 ## Global Constraints
 
+- Prerequisites: fixtures-inputs for fixture loading; run-persistence-interchange for public exports.
 - Hidden answers must never appear in public exports.
 - Evaluator-only fixtures cannot be scored locally.
 - Gated fixtures require environment references, not inline secrets.

@@ -4,13 +4,14 @@
 
 **Goal:** Add a solver seam so scaffold-aware comparisons can vary solver strategy independently from task data, model adapter, and scaffold policy.
 
-**Architecture:** Add `internal/solver` with a small `Solver` interface. Existing single-shot code generation becomes the default solver. Later solvers compose planner, tool use, external CLI agents, or multi-agent roles behind the same interface.
+**Architecture:** Add `internal/solver` with a small `Solver` interface. `single_shot_code` is the default solver. Later solvers compose planner, tool use, external CLI agents, or multi-agent roles behind the same interface.
 
 **Tech Stack:** Go, context cancellation, dependency injection, table-driven tests.
 
 ## Global Constraints
 
-- Current benchmark behavior remains the default `single_shot_code` solver.
+- Prerequisites: provider-model-adapters, prompt-rendering-response-parsing, and scaffold-tools-policy.
+- `single_shot_code` is the default solver.
 - Solvers must emit trace events and artifacts through common result types.
 - External agents require explicit sandbox and approval policy.
 - Solver outputs must be compatible with the task primary channel.
@@ -92,7 +93,7 @@ Expected: FAIL because `SingleShotCode` is undefined.
 
 - [ ] **Step 3: Implement default solver**
 
-Move code-generation plus execution orchestration from benchmark runner helpers into `SingleShotCode`. Keep old public helpers as wrappers during migration.
+Put code-generation plus execution orchestration behind `SingleShotCode`. Have public benchmark helpers call `SingleShotCode` so callers get the same result shape.
 
 - [ ] **Step 4: Run tests**
 

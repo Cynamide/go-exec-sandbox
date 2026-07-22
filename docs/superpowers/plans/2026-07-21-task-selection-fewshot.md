@@ -10,7 +10,8 @@
 
 ## Global Constraints
 
-- Current manifest resolves to every task, one enabled model, baseline scaffold, and every scaffold variant.
+- Prerequisites: provider-model-adapters for model IDs; manifest scaffold loading for scaffold IDs.
+- Omitted selection config resolves to every task, one enabled model, baseline scaffold, and every scaffold variant.
 - A selection resolving to zero models, scaffolds, or tasks must fail before execution.
 - Few-shot sampling must use `runtime_defaults.random_seed`.
 - Lift reporting requires a baseline scaffold in the selected matrix.

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the Ollama-only LLM path with a provider-neutral model adapter layer while preserving the current Ollama manifest behavior.
+**Goal:** Add a provider-neutral model adapter layer with Ollama-compatible manifest behavior.
 
 **Architecture:** Add a small model adapter seam in `internal/modeladapter` and make the manifest resolve enabled model entries into adapter configs. Keep Ollama as the first adapter. Add OpenAI-compatible support after the seam exists, then wire benchmark service construction through the resolved adapter registry.
 
@@ -10,7 +10,8 @@
 
 ## Global Constraints
 
-- Keep the current `benchmark.yaml` valid.
+- Prerequisites: none.
+- Keep the repository `benchmark.yaml` valid.
 - Do not add live support for a provider kind until it has tests and an adapter.
 - Provider secrets must be read from environment variables, never inline manifest values.
 - Capability mismatches must fail during manifest loading or service construction.
@@ -45,7 +46,7 @@ Expected: FAIL because `internal/modeladapter` does not exist.
 
 - [ ] **Step 3: Implement the types and validation**
 
-Define `Config` with `ID`, `ProviderID`, `ProviderKind`, `ModelName`, `EndpointURL`, `Params`, and `Capabilities`. Define `Adapter.Generate(ctx context.Context, req ModelRequest) (ModelResponse, error)` and `Adapter.HealthCheck(ctx context.Context) error`.
+Define `Config` with `ID`, `ProviderID`, `ProviderKind`, `ModelName`, `BaseURL`, `APIKeyEnv`, `Params`, `RequestMapping`, `ResponseMapping`, and `Capabilities`. Define `Adapter.Generate(ctx context.Context, req ModelRequest) (ModelResponse, error)` and `Adapter.HealthCheck(ctx context.Context) error`.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -93,7 +94,7 @@ Expected: FAIL because `NewOllamaAdapter` is undefined.
 
 - [ ] **Step 3: Implement adapter construction**
 
-Move URL parsing and Ollama client creation from `internal/llm/llm.go` into `internal/modeladapter/ollama.go`. Keep `llm.NewClientWithConfig` as a compatibility wrapper around the Ollama adapter until `benchmark.Service` consumes adapters directly.
+Implement URL parsing and Ollama client creation in `internal/modeladapter/ollama.go`. Have `llm.NewClientWithConfig` construct the Ollama adapter so public LLM construction keeps the same caller contract.
 
 - [ ] **Step 4: Run focused tests**
 
@@ -115,7 +116,7 @@ git commit -m "Move Ollama behind model adapter"
 
 **Interfaces:**
 - Consumes: `modeladapter.Config`
-- Produces: `manifest.Loaded.Models []modeladapter.Config`
+- Produces: `manifest.Loaded.Models []modeladapter.Config`, `manifest.Loaded.DefaultModelRoles map[string]string`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -138,7 +139,7 @@ Expected: FAIL because `Loaded.Models` is undefined.
 
 - [ ] **Step 3: Implement model config resolution**
 
-Parse provider kind, base URL, base URL env, API key env, enabled model entries, params, and capabilities. Keep non-Ollama kinds rejected until their adapters are implemented.
+Parse provider kind, base URL, base URL env, API key env, enabled model entries, params, capabilities, request mappings, response mappings, and `default_model_roles`. Keep non-Ollama kinds rejected until their adapters are implemented.
 
 - [ ] **Step 4: Run focused tests**
 
@@ -152,7 +153,51 @@ git add internal/manifest internal/modeladapter
 git commit -m "Resolve model adapter configs from manifest"
 ```
 
-### Task 4: Add OpenAI-Compatible Adapter
+### Task 4: Add Request/Response Mapping Validation
+
+**Files:**
+- Modify: `internal/modeladapter/types.go`
+- Modify: `internal/modeladapter/types_test.go`
+- Modify: `internal/manifest/manifest.go`
+- Modify: `internal/manifest/manifest_test.go`
+
+**Interfaces:**
+- Consumes: `modeladapter.Config`
+- Produces: `modeladapter.RequestMapping`, `modeladapter.ResponseMapping`, `modeladapter.ValidateMappings(cfg Config) error`
+
+- [ ] **Step 1: Write the failing test**
+
+```go
+func TestCustomHTTPProviderRequiresMappings(t *testing.T) {
+	cfg := modeladapter.Config{ID: "custom", ProviderKind: "custom_http", ModelName: "custom-model", BaseURL: "http://localhost:8080"}
+	if err := modeladapter.ValidateMappings(cfg); err == nil {
+		t.Fatal("ValidateMappings() error = nil, want missing mapping error")
+	}
+}
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/modeladapter`
+Expected: FAIL because `ValidateMappings` is undefined.
+
+- [ ] **Step 3: Implement mapping validation**
+
+Represent request body template, request path, method, response text path, response tool-call path, and response usage path. Reject `custom_http` providers unless both request and response mappings are configured.
+
+- [ ] **Step 4: Run tests**
+
+Run: `GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/modeladapter ./internal/manifest`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add internal/modeladapter internal/manifest
+git commit -m "Validate custom model request mappings"
+```
+
+### Task 5: Add OpenAI-Compatible Adapter
 
 **Files:**
 - Create: `internal/modeladapter/openai_compatible.go`

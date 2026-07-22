@@ -10,6 +10,7 @@
 
 ## Global Constraints
 
+- Prerequisites: reporting-trace for trace/artifact models; grading for persisted score results.
 - Run state must include a manifest snapshot.
 - Resume must reject incompatible manifest snapshots.
 - Prediction import must validate task and model IDs.
@@ -135,7 +136,7 @@ Expected: FAIL because import/export functions are undefined.
 
 - [ ] **Step 3: Implement interchange**
 
-Support JSONL prediction import with task ID, model ID, scaffold ID, sample ID, and output. Support JSON and JSONL result export.
+Support JSONL prediction import with task ID, model ID, scaffold ID, sample ID, and output. Support JSON, JSONL, and leaderboard submission export.
 
 - [ ] **Step 4: Run tests**
 
@@ -149,7 +150,57 @@ git add internal/runstore cmd/evaluator
 git commit -m "Add prediction import and result export"
 ```
 
-### Task 4: Add Rescore Command
+### Task 4: Add Retry-Failed Planning
+
+**Files:**
+- Modify: `internal/runstore/store.go`
+- Create: `internal/runstore/retry_test.go`
+- Modify: `cmd/evaluator/main.go`
+- Modify: `cmd/evaluator/benchmark_cli_test.go`
+
+**Interfaces:**
+- Consumes: persisted `SampleRecord` results and `CacheKey`
+- Produces: `RetryFailedPlan(runID string) (ResumePlan, error)`
+
+- [ ] **Step 1: Write the failing test**
+
+```go
+func TestRetryFailedPlanIncludesOnlyFailedSamples(t *testing.T) {
+	store := runstore.New(t.TempDir())
+	writeSampleRecord(t, store, "run-1", runstore.SampleRecord{SampleID: "a", Passed: true})
+	writeSampleRecord(t, store, "run-1", runstore.SampleRecord{SampleID: "b", Passed: false})
+	plan, err := store.RetryFailedPlan("run-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.ToRun) != 1 || plan.ToRun[0].SampleID != "b" {
+		t.Fatalf("retry plan = %+v", plan)
+	}
+}
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/runstore`
+Expected: FAIL because retry-failed planning is undefined.
+
+- [ ] **Step 3: Implement retry-failed planning**
+
+Build retry plans from failed persisted samples only. Keep retry-failed separate from `max_attempts`; retries start from stored failures rather than adding attempts during initial execution.
+
+- [ ] **Step 4: Run tests**
+
+Run: `GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/runstore ./cmd/evaluator`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add internal/runstore cmd/evaluator
+git commit -m "Add retry-failed run planning"
+```
+
+### Task 5: Add Rescore Command
 
 **Files:**
 - Create: `internal/runstore/rescore.go`

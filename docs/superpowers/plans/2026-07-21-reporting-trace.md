@@ -2,15 +2,16 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Expand reports and traces to include benchmark metadata, run identity, model/sample/fixture/task-mode data, artifacts, per-check grades, and process evidence while preserving current lift summaries.
+**Goal:** Expand reports and traces to include benchmark metadata, run identity, model/sample/fixture/task-mode data, artifacts, per-check grades, process evidence, and lift summaries.
 
-**Architecture:** Extend `benchmark.Run` and `BenchmarkReport` with additive fields. Keep existing JSON fields stable. Add trace/artifact structures and deterministic report ordering.
+**Architecture:** Extend `benchmark.Run` and `BenchmarkReport` with additive fields. Keep published JSON fields stable. Add trace/artifact structures and deterministic report ordering.
 
 **Tech Stack:** Go, JSON structs, deterministic sorting, table-driven tests.
 
 ## Global Constraints
 
-- Existing JSON report fields remain available.
+- Prerequisites: runtime-controls for run identity fields; fixtures-inputs for sample and split fields.
+- JSON report fields used by callers remain available.
 - Report arrays must be deterministic.
 - Disabled capture fields must be omitted or redacted.
 - Trace data must be sufficient for process grading.

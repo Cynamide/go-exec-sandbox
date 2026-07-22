@@ -10,6 +10,7 @@
 
 ## Global Constraints
 
+- Prerequisites: provider-model-adapters for model-side scoring capability hooks.
 - Do not require logprob support from adapters that only generate text.
 - Judge scoring requires a configured judge model role.
 - Reward scoring requires an interactive environment.

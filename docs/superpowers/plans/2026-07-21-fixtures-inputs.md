@@ -10,6 +10,7 @@
 
 ## Global Constraints
 
+- Prerequisites: none.
 - Inline `test_cases` remain supported.
 - Fixture paths must resolve under the repository unless explicitly allowed by config.
 - Missing required environment variables fail before task execution.
@@ -47,7 +48,31 @@ Expected: FAIL because `internal/fixtures` does not exist.
 
 - [ ] **Step 3: Implement registry validation**
 
-Support `task_cases`, `rubric`, `preference_rubric`, `repo_seed`, `browser_fixture`, `multimodal_fixture`, `attachment`, `expected_files`, and `golden_patch` kinds.
+Add the registry contract with these exact field names so manifest parsing can consume it later:
+
+```go
+type Registry struct {
+	Definitions map[string]Definition
+}
+
+type Definition struct {
+	ID          string
+	Kind        string
+	Path        string
+	Format      string
+	Split       string
+	Environment map[string]string
+}
+
+type Case struct {
+	ID             string
+	Input          string
+	ExpectedOutput string
+	Metadata       map[string]string
+}
+```
+
+Validate supported kinds: `task_cases`, `rubric`, `preference_rubric`, `repo_seed`, `browser_fixture`, `multimodal_fixture`, `attachment`, `expected_files`, and `golden_patch`.
 
 - [ ] **Step 4: Run tests**
 

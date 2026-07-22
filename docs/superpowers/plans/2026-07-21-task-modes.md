@@ -4,13 +4,14 @@
 
 **Goal:** Add explicit task-mode dispatch so code execution, artifact-only, repo patch, browser/API/visual/text, choice scoring, and log-likelihood tasks have separate runner contracts.
 
-**Architecture:** Add `internal/runner` with a `Runner` interface and a registry keyed by task mode. Start by moving current code execution behind `code_exec`, then add validation-only stubs for modes that depend on other component plans.
+**Architecture:** Add `internal/runner` with a `Runner` interface and a registry keyed by task mode. Route code execution through `code_exec`, then add validation-only stubs for modes that depend on other component plans.
 
 **Tech Stack:** Go, interface-based dispatch, table-driven tests.
 
 ## Global Constraints
 
-- `code_exec` remains compatible with the current benchmark.
+- Prerequisites: runtime-controls, fixtures-inputs, provider-model-adapters, prompt-rendering-response-parsing, solver-agent-composition, and scoring-interfaces.
+- `code_exec` remains compatible with the repository benchmark fixtures.
 - Unknown task modes fail during manifest load or runner registry construction.
 - Modes requiring capabilities must validate those capabilities before execution.
 - Runner outputs must produce a normalized artifact for grading.
@@ -46,7 +47,7 @@ Expected: FAIL because `internal/runner` does not exist.
 
 - [ ] **Step 3: Implement registry**
 
-Define runner request with task, sample, scaffold, solver, environment, scorer, and runtime config. Add registration and lookup by mode string.
+Define runner request with `benchmark.Task`, `benchmark.Sample`, `benchmark.Scaffold`, `benchmark.RuntimeConfig`, `modeladapter.Adapter`, and parsed model output. Add registration and lookup by mode string; environment and scorer fields are added by the plans that introduce those concrete interfaces.
 
 - [ ] **Step 4: Run tests**
 
@@ -60,7 +61,7 @@ git add internal/runner
 git commit -m "Add task runner registry"
 ```
 
-### Task 2: Move Current Code Path Behind `code_exec`
+### Task 2: Route Code Execution Through `code_exec`
 
 **Files:**
 - Create: `internal/runner/code_exec.go`
@@ -90,7 +91,7 @@ Expected: FAIL because `CodeExec` is undefined.
 
 - [ ] **Step 3: Implement code exec runner**
 
-Route the existing generation/execution/grading path through `runner.CodeExec`. Keep benchmark service output unchanged.
+Route generation, execution, and grading through `runner.CodeExec`. Keep benchmark service output unchanged.
 
 - [ ] **Step 4: Run tests**
 

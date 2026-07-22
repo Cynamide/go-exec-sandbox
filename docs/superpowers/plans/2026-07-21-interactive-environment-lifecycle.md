@@ -10,10 +10,11 @@
 
 ## Global Constraints
 
+- Prerequisites: task-modes for runner validation hooks.
 - Interactive environments must define cleanup policy.
 - Secrets cannot appear in auth/session fixture values.
 - Environment traces must be usable for replay and process grading.
-- Existing code execution remains independent from interactive environments.
+- Code execution remains independent from interactive environments.
 
 ---
 

@@ -10,6 +10,7 @@
 
 ## Global Constraints
 
+- Prerequisites: fixtures-inputs for attachment resolution; provider-model-adapters for model request payloads.
 - Attachment paths must stay inside approved fixture roots.
 - Hidden/private attachment visibility belongs to dataset access policy.
 - Model capability mismatches fail before execution.
@@ -149,7 +150,100 @@ git add internal/attachments internal/modeladapter
 git commit -m "Validate attachment model capabilities"
 ```
 
-### Task 4: Add Attachment Report References
+### Task 4: Add Native Model Payload Hooks
+
+**Files:**
+- Create: `internal/attachments/payload.go`
+- Create: `internal/attachments/payload_test.go`
+- Modify: `internal/modeladapter/types.go`
+- Modify: `internal/modeladapter/types_test.go`
+
+**Interfaces:**
+- Consumes: `attachments.Attachment`, `modeladapter.ModelRequest`
+- Produces: `attachments.BuildModelParts(root string, atts []Attachment) ([]modeladapter.ContentPart, error)`
+
+- [ ] **Step 1: Write the failing test**
+
+```go
+func TestBuildModelPartsIncludesImageMediaType(t *testing.T) {
+	path := writePNGFixture(t)
+	parts, err := attachments.BuildModelParts(filepath.Dir(path), []attachments.Attachment{{Kind: "image", Path: filepath.Base(path), MediaType: "image/png"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parts[0].MediaType != "image/png" {
+		t.Fatalf("parts = %+v", parts)
+	}
+}
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/attachments ./internal/modeladapter`
+Expected: FAIL because model request content parts are undefined.
+
+- [ ] **Step 3: Implement native payload hooks**
+
+Add `modeladapter.ContentPart` with text, media type, file name, and bytes or URI fields. Convert attachments into content parts for adapters that declare native modality support.
+
+- [ ] **Step 4: Run tests**
+
+Run: `GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/attachments ./internal/modeladapter`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add internal/attachments internal/modeladapter
+git commit -m "Add multimodal model payload hooks"
+```
+
+### Task 5: Add Attachment Preprocessing Hooks
+
+**Files:**
+- Create: `internal/attachments/preprocess.go`
+- Create: `internal/attachments/preprocess_test.go`
+- Modify: `internal/manifest/manifest.go`
+- Modify: `internal/manifest/manifest_test.go`
+
+**Interfaces:**
+- Consumes: `attachments.Attachment`
+- Produces: `PreprocessorRegistry`, `PreprocessAttachment(ctx context.Context, att Attachment) (Attachment, error)`
+
+- [ ] **Step 1: Write the failing test**
+
+```go
+func TestPreprocessorRegistryRejectsUnknownHook(t *testing.T) {
+	registry := attachments.PreprocessorRegistry{}
+	_, err := registry.Run(context.Background(), attachments.Attachment{Kind: "pdf", Preprocessor: "missing"})
+	if err == nil {
+		t.Fatal("Run() error = nil, want unknown preprocessor")
+	}
+}
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/attachments`
+Expected: FAIL because preprocessing hooks are undefined.
+
+- [ ] **Step 3: Implement preprocessing registry**
+
+Parse explicit preprocessor names from attachment config. Add validation-only hooks for documents, spreadsheets, audio, and video, and return unsupported errors until concrete preprocessors are registered.
+
+- [ ] **Step 4: Run tests**
+
+Run: `GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/attachments ./internal/manifest`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add internal/attachments internal/manifest
+git commit -m "Add attachment preprocessing hooks"
+```
+
+### Task 6: Add Attachment Report References
 
 **Files:**
 - Modify: `internal/benchmark/model.go`
