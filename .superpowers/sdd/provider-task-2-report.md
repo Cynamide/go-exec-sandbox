@@ -64,3 +64,55 @@ ok  	gexec-sandbox/internal/llm	0.420s
 ## Any concerns
 
 - None.
+
+## Follow-up Fix: Preserve Ollama Client Construction Behavior (July 22, 2026)
+
+### RED
+
+Command:
+
+```bash
+GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/modeladapter ./internal/llm
+```
+
+Output:
+
+```text
+--- FAIL: TestNewOllamaAdapterAllowsEmptyModelName (0.00s)
+    ollama_test.go:28: NewOllamaAdapter() error = model adapter config "ollama" missing model name, want nil
+FAIL
+FAIL	gexec-sandbox/internal/modeladapter	0.442s
+--- FAIL: TestNewClientWithConfigAllowsEmptyModelWithExplicitHost (0.00s)
+    llm_test.go:70: NewClientWithConfig() error = failed to create Ollama client: model adapter config id is required, want nil
+--- FAIL: TestWaitForOllamaWithConfigAllowsEmptyModelWithExplicitHost (0.00s)
+    llm_test.go:86: WaitForOllamaWithConfig() error = failed to create Ollama client: model adapter config id is required, want context canceled
+FAIL
+FAIL	gexec-sandbox/internal/llm	0.821s
+FAIL
+```
+
+Why it failed as expected:
+
+- `ollamaAdapterConfig` derived both adapter `ID` and `ModelName` from `OLLAMAModel`, so an empty model regressed host-only construction.
+- `NewOllamaAdapter` reused generic adapter validation, which incorrectly made model selection mandatory for health-check-only flows.
+
+### GREEN
+
+Command:
+
+```bash
+GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/modeladapter ./internal/llm
+```
+
+Output:
+
+```text
+ok  	gexec-sandbox/internal/modeladapter	0.427s
+ok  	gexec-sandbox/internal/llm	0.803s
+```
+
+What changed:
+
+- Preserved host-only `llm.NewClientWithConfig` construction by giving the Ollama adapter a stable fallback ID when `OLLAMAModel` is empty.
+- Relaxed Ollama adapter construction to validate adapter identity and provider kind without requiring a model up front.
+- Kept generation behind `modeladapter.Adapter` and added an explicit runtime guard so chat generation still fails clearly if no model name is configured.

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"gexec-sandbox/internal/config"
 	"gexec-sandbox/internal/modeladapter"
 )
 
@@ -58,5 +59,30 @@ func TestGenerateCodeUsesAdapterResponse(t *testing.T) {
 
 	if got, want := len(adapter.lastReq.Messages), 2; got != want {
 		t.Fatalf("request message count = %d, want %d", got, want)
+	}
+}
+
+func TestNewClientWithConfigAllowsEmptyModelWithExplicitHost(t *testing.T) {
+	client, err := NewClientWithConfig(config.Config{
+		OLLAMAHost: "http://localhost:11434",
+	})
+	if err != nil {
+		t.Fatalf("NewClientWithConfig() error = %v, want nil", err)
+	}
+
+	if client == nil {
+		t.Fatal("NewClientWithConfig() returned nil client")
+	}
+}
+
+func TestWaitForOllamaWithConfigAllowsEmptyModelWithExplicitHost(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := WaitForOllamaWithConfig(ctx, config.Config{
+		OLLAMAHost: "http://localhost:11434",
+	})
+	if err != context.Canceled {
+		t.Fatalf("WaitForOllamaWithConfig() error = %v, want %v", err, context.Canceled)
 	}
 }

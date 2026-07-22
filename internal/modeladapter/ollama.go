@@ -15,7 +15,7 @@ type ollamaAdapter struct {
 }
 
 func NewOllamaAdapter(cfg Config) (Adapter, error) {
-	if err := cfg.Validate(); err != nil {
+	if err := validateOllamaConfig(cfg); err != nil {
 		return nil, err
 	}
 
@@ -31,6 +31,10 @@ func NewOllamaAdapter(cfg Config) (Adapter, error) {
 }
 
 func (a *ollamaAdapter) Generate(ctx context.Context, req ModelRequest) (ModelResponse, error) {
+	if a.modelName == "" {
+		return ModelResponse{}, fmt.Errorf("ollama generate: model name is required")
+	}
+
 	chatReq := &api.ChatRequest{
 		Model:    a.modelName,
 		Messages: make([]api.Message, 0, len(req.Messages)),
@@ -65,6 +69,16 @@ func (a *ollamaAdapter) Generate(ctx context.Context, req ModelRequest) (ModelRe
 func (a *ollamaAdapter) HealthCheck(ctx context.Context) error {
 	_, err := a.client.List(ctx)
 	return err
+}
+
+func validateOllamaConfig(cfg Config) error {
+	if cfg.ID == "" {
+		return fmt.Errorf("model adapter config id is required")
+	}
+	if cfg.ProviderKind != "" && cfg.ProviderKind != "ollama" {
+		return fmt.Errorf("model adapter config %q has unsupported provider kind %q", cfg.ID, cfg.ProviderKind)
+	}
+	return nil
 }
 
 func newOllamaClient(baseURL string) (*api.Client, error) {

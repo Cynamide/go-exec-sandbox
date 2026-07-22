@@ -92,8 +92,13 @@ func WaitForOllamaWithConfig(ctx context.Context, cfg config.Config) error {
 }
 
 func ollamaAdapterConfig(cfg config.Config) modeladapter.Config {
+	adapterID := cfg.OLLAMAModel
+	if adapterID == "" {
+		adapterID = "ollama"
+	}
+
 	return modeladapter.Config{
-		ID:           cfg.OLLAMAModel,
+		ID:           adapterID,
 		ProviderID:   "ollama",
 		ProviderKind: "ollama",
 		ModelName:    cfg.OLLAMAModel,
