@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"gexec-sandbox/internal/config"
+	"gexec-sandbox/internal/modeladapter"
 	"github.com/ollama/ollama/api"
 )
 
@@ -17,8 +18,7 @@ const (
 )
 
 type Client struct {
-	client *api.Client
-	cfg    config.Config
+	adapter modeladapter.Adapter
 }
 
 func NewClient() (*Client, error) {
@@ -26,17 +26,16 @@ func NewClient() (*Client, error) {
 }
 
 func NewClientWithConfig(cfg config.Config) (*Client, error) {
-	client, err := ollamaAPIClient(cfg)
+	adapter, err := modeladapter.NewOllamaAdapter(ollamaAdapterConfig(cfg))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Ollama client: %w", err)
 	}
-	return &Client{client: client, cfg: cfg}, nil
+	return &Client{adapter: adapter}, nil
 }
 
-func (c *Client) chatRequest(problem string, language string) *api.ChatRequest {
-	return &api.ChatRequest{
-		Model: c.cfg.OLLAMAModel,
-		Messages: []api.Message{
+func (c *Client) chatRequest(problem string, language string) modeladapter.ModelRequest {
+	return modeladapter.ModelRequest{
+		Messages: []modeladapter.Message{
 			{
 				Role:    "system",
 				Content: systemPrompt,
@@ -46,7 +45,6 @@ func (c *Client) chatRequest(problem string, language string) *api.ChatRequest {
 				Content: fmt.Sprintf("Write a %s solution for:\n%s", language, problem),
 			},
 		},
-		Stream: new(bool),
 	}
 }
 
@@ -55,18 +53,12 @@ func (c *Client) GenerateCode(ctx context.Context, problem string, language stri
 	defer cancel()
 
 	req := c.chatRequest(problem, language)
-
-	var response string
-	err := c.client.Chat(ctx, req, func(resp api.ChatResponse) error {
-		response += resp.Message.Content
-		return nil
-	})
-
+	resp, err := c.adapter.Generate(ctx, req)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate code: %w", err)
 	}
 
-	return response, nil
+	return resp.Text, nil
 }
 
 func WaitForOllama(ctx context.Context) error {
@@ -74,7 +66,7 @@ func WaitForOllama(ctx context.Context) error {
 }
 
 func WaitForOllamaWithConfig(ctx context.Context, cfg config.Config) error {
-	client, err := ollamaAPIClient(cfg)
+	adapter, err := modeladapter.NewOllamaAdapter(ollamaAdapterConfig(cfg))
 	if err != nil {
 		return fmt.Errorf("failed to create Ollama client: %w", err)
 	}
@@ -91,12 +83,21 @@ func WaitForOllamaWithConfig(ctx context.Context, cfg config.Config) error {
 			return ctx.Err()
 		case <-ticker.C:
 			log.Println("Checking Ollama availability...")
-			_, err := client.List(ctx)
-			if err == nil {
+			if err := adapter.HealthCheck(ctx); err == nil {
 				log.Println("Ollama is available")
 				return nil
 			}
 		}
+	}
+}
+
+func ollamaAdapterConfig(cfg config.Config) modeladapter.Config {
+	return modeladapter.Config{
+		ID:           cfg.OLLAMAModel,
+		ProviderID:   "ollama",
+		ProviderKind: "ollama",
+		ModelName:    cfg.OLLAMAModel,
+		BaseURL:      cfg.OLLAMAHost,
 	}
 }
 
