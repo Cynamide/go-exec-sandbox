@@ -23,19 +23,11 @@ func New(cfg Config) (Adapter, error) {
 		}
 		return NewOllamaAdapter(cfg)
 	case "openai_compatible":
-		switch cfg.Auth.Type {
-		case "":
-		case "none":
-			cfg.APIKeyEnv = ""
-		case "bearer_env":
-			if cfg.Auth.Env == "" {
-				return nil, fmt.Errorf("model adapter config %q bearer_env auth requires env", cfg.ID)
-			}
-			cfg.APIKeyEnv = cfg.Auth.Env
-		default:
-			return nil, fmt.Errorf("model adapter config %q auth type %q is not supported by the OpenAI-compatible runtime", cfg.ID, cfg.Auth.Type)
+		normalized, err := normalizeOpenAICompatibleAuth(cfg)
+		if err != nil {
+			return nil, err
 		}
-		return NewOpenAICompatibleAdapter(cfg)
+		return NewOpenAICompatibleAdapter(normalized)
 	default:
 		return nil, fmt.Errorf("model adapter config %q has unsupported provider kind %q", cfg.ID, cfg.ProviderKind)
 	}

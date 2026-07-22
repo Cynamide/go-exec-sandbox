@@ -59,6 +59,12 @@ type openAICompatibleChatResponse struct {
 }
 
 func NewOpenAICompatibleAdapter(cfg Config) (Adapter, error) {
+	normalized, err := normalizeOpenAICompatibleAuth(cfg)
+	if err != nil {
+		return nil, err
+	}
+	cfg = normalized
+
 	if err := validateOpenAICompatibleConfig(cfg); err != nil {
 		return nil, err
 	}
@@ -155,6 +161,8 @@ func (a *openAICompatibleAdapter) Generate(ctx context.Context, req ModelRequest
 
 func (a *openAICompatibleAdapter) HealthCheck(ctx context.Context) error {
 	if a.baseURL == nil {
+		// Direct generation endpoints do not imply a safe model-list endpoint.
+		// Treat construction-time URL/auth validation as the startup check.
 		return nil
 	}
 	httpReq, err := a.newJSONRequest(ctx, http.MethodGet, "/models", nil)
@@ -277,6 +285,30 @@ func validateOpenAICompatibleConfig(cfg Config) error {
 		return fmt.Errorf("model adapter config %q missing model name", cfg.ID)
 	}
 	return nil
+}
+
+func normalizeOpenAICompatibleAuth(cfg Config) (Config, error) {
+	switch cfg.Auth.Type {
+	case "":
+		return cfg, nil
+	case "none":
+		if cfg.Auth.Env != "" || cfg.Auth.Header != "" {
+			return Config{}, fmt.Errorf("model adapter config %q auth type none must not include env or header", cfg.ID)
+		}
+		cfg.APIKeyEnv = ""
+		return cfg, nil
+	case "bearer_env":
+		if cfg.Auth.Env == "" {
+			return Config{}, fmt.Errorf("model adapter config %q bearer_env auth requires env", cfg.ID)
+		}
+		if cfg.Auth.Header != "" {
+			return Config{}, fmt.Errorf("model adapter config %q bearer_env auth does not support custom header", cfg.ID)
+		}
+		cfg.APIKeyEnv = cfg.Auth.Env
+		return cfg, nil
+	default:
+		return Config{}, fmt.Errorf("model adapter config %q auth type %q is not supported by the OpenAI-compatible runtime", cfg.ID, cfg.Auth.Type)
+	}
 }
 
 func validateOpenAICompatibleURL(configID string, label string, providerURL *url.URL) error {

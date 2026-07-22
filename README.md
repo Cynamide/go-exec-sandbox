@@ -65,8 +65,12 @@ The evaluator reads benchmark runtime, model, task, and scaffold settings from `
 The currently implemented manifest fields are:
 
 - `runtime_defaults.timeout_ms`
-- `providers` entries with `kind: ollama`
-- one enabled Ollama model under `models`
+- `providers` entries with `kind: ollama` or `kind: openai_compatible`
+- one or more enabled models under `models`
+- provider URLs from `base_url`, `base_url_env`, or model-level `endpoint_url`
+- auth through provider-level `api_key_env` or model-level `auth: {type: bearer_env, env: ...}`
+- supported model params such as `temperature` and `max_tokens`
+- model capabilities plus `default_model_roles`
 - `tasks` with IDs, titles, descriptions, families, languages, artifact expectations, and test cases
 - `scaffolds` with baseline flag, prompt prefix, descriptions, and tool metadata
 
@@ -478,8 +482,8 @@ This project is being developed as a benchmark harness for economically meaningf
   - ✅ Baseline success rate tracking
   - ✅ Scaffolded success rate tracking
   - ✅ Lift reporting across scaffold conditions
+  - ✅ Cross-model benchmark matrices and comparison summaries
   - 🚧 Richer artifact grading modes and judge-driven scoring configuration
-  - 🚧 Cross-model benchmark matrices and comparison workflows
 
 - **Benchmark Scope**
   - ✅ Code execution and validation against task-specific outputs
@@ -491,7 +495,7 @@ This project is being developed as a benchmark harness for economically meaningf
 - **Enhanced Features**
   - ✅ Centralized benchmark manifest for the currently supported benchmark surface
   - 🚧 Expanded manifest support for tools, grading, fixtures, and additional task modes
-  - 🚧 Batch evaluation mode for comparing multiple models
+  - ✅ Batch evaluation mode for comparing multiple enabled models
   - 🚧 Result caching and persistence
   - 🚧 Progress tracking and status reporting
   - ✅ Benchmark CLI mode for running benchmarks locally

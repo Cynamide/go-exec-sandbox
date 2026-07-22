@@ -591,6 +591,81 @@ func TestNewAdapterAuthNoneSuppressesProviderAPIKey(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleAdapterRejectsMalformedCanonicalAuth(t *testing.T) {
+	for name, auth := range map[string]AuthConfig{
+		"none with env":      {Type: "none", Env: "UNUSED_API_KEY"},
+		"none with header":   {Type: "none", Header: "Authorization"},
+		"bearer with header": {Type: "bearer_env", Env: "REMOTE_MODEL_API_KEY", Header: "X-API-Key"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := NewOpenAICompatibleAdapter(Config{
+				ID:           "local",
+				ProviderKind: "openai_compatible",
+				BaseURL:      "http://openai.test/v1",
+				ModelName:    "local-model",
+				Auth:         auth,
+			})
+			if err == nil || !strings.Contains(err.Error(), "auth") {
+				t.Fatalf("NewOpenAICompatibleAdapter() error = %v, want malformed auth error", err)
+			}
+		})
+	}
+}
+
+func TestOpenAICompatibleAdapterAuthNoneSuppressesProviderAPIKey(t *testing.T) {
+	t.Setenv("PROVIDER_API_KEY", "secret-key")
+
+	adapter, err := NewOpenAICompatibleAdapter(Config{
+		ID:           "local",
+		ProviderKind: "openai_compatible",
+		BaseURL:      "http://openai.test/v1",
+		ModelName:    "local-model",
+		APIKeyEnv:    "PROVIDER_API_KEY",
+		Auth:         AuthConfig{Type: "none"},
+	})
+	if err != nil {
+		t.Fatalf("NewOpenAICompatibleAdapter() error = %v", err)
+	}
+
+	typedAdapter := adapter.(*openAICompatibleAdapter)
+	typedAdapter.httpClient = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if got := r.Header.Get("Authorization"); got != "" {
+			t.Fatalf("Authorization = %q, want empty for auth none", got)
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"answer"}}]}`)),
+		}, nil
+	})}
+
+	if _, err := adapter.Generate(context.Background(), ModelRequest{}); err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+}
+
+func TestOpenAICompatibleAdapterDirectEndpointHealthCheckIsNoop(t *testing.T) {
+	adapter, err := NewOpenAICompatibleAdapter(Config{
+		ID:           "local",
+		ProviderKind: "openai_compatible",
+		EndpointURL:  "http://openai.test/custom/generate",
+		ModelName:    "local-model",
+	})
+	if err != nil {
+		t.Fatalf("NewOpenAICompatibleAdapter() error = %v", err)
+	}
+
+	typedAdapter := adapter.(*openAICompatibleAdapter)
+	typedAdapter.httpClient = &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		t.Fatal("HealthCheck() should not probe direct endpoint-only configs")
+		return nil, nil
+	})}
+
+	if err := adapter.HealthCheck(context.Background()); err != nil {
+		t.Fatalf("HealthCheck() error = %v, want nil", err)
+	}
+}
+
 func TestOpenAICompatibleAdapterRejectsUnsupportedConfigParam(t *testing.T) {
 	_, err := NewOpenAICompatibleAdapter(Config{
 		ID:           "local",
