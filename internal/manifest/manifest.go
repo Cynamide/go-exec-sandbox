@@ -221,14 +221,13 @@ func (m file) defaultModelRoles(models []modeladapter.Config) (map[string]string
 }
 
 func (m file) ollamaSelection() (string, string, error) {
+	enabledModelID := ""
 	enabledModelName := ""
 	enabledProvider := provider{}
-	for name, candidate := range m.Models {
+	for _, name := range sortedKeys(m.Models) {
+		candidate := m.Models[name]
 		if !candidate.Enabled {
 			continue
-		}
-		if enabledModelName != "" {
-			return "", "", fmt.Errorf("%w: only one enabled model is supported", ErrInvalidManifest)
 		}
 		if candidate.ModelName == "" {
 			return "", "", fmt.Errorf("%w: model %q missing model_name", ErrInvalidManifest, name)
@@ -240,12 +239,15 @@ func (m file) ollamaSelection() (string, string, error) {
 		if providerConfig.Kind != "ollama" {
 			return "", "", fmt.Errorf("%w: provider kind %q is not supported by the current runtime", ErrInvalidManifest, providerConfig.Kind)
 		}
-		enabledModelName = candidate.ModelName
-		enabledProvider = providerConfig
+		if enabledModelID == "" {
+			enabledModelID = name
+			enabledModelName = candidate.ModelName
+			enabledProvider = providerConfig
+		}
 	}
 
-	if enabledModelName == "" {
-		return "", "", fmt.Errorf("%w: exactly one enabled ollama model is required", ErrInvalidManifest)
+	if enabledModelID == "" {
+		return "", "", fmt.Errorf("%w: at least one enabled ollama model is required", ErrInvalidManifest)
 	}
 
 	ollamaHost := resolveBaseURL(enabledProvider)
@@ -340,17 +342,6 @@ func copyAnyMap(source map[string]any) map[string]any {
 		return nil
 	}
 	cloned := make(map[string]any, len(source))
-	for key, value := range source {
-		cloned[key] = value
-	}
-	return cloned
-}
-
-func copyStringMap(source map[string]string) map[string]string {
-	if len(source) == 0 {
-		return nil
-	}
-	cloned := make(map[string]string, len(source))
 	for key, value := range source {
 		cloned[key] = value
 	}

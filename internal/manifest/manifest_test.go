@@ -239,6 +239,57 @@ scaffolds:
 	}
 }
 
+func TestLoadAllowsMultipleEnabledOllamaModels(t *testing.T) {
+	loaded, err := Load(writeManifest(t, `
+schema_version: 1
+providers:
+  ollama_local:
+    kind: ollama
+    base_url: http://localhost:11434
+models:
+  zed_local:
+    provider: ollama_local
+    model_name: zed:7b
+    enabled: true
+  alpha_local:
+    provider: ollama_local
+    model_name: alpha:3b
+    enabled: true
+tasks:
+  task:
+    id: task
+    title: Task
+    description: Desc
+    family: support_workflows
+    language: python
+    test_cases:
+      - input: ""
+        expected_output: ok
+scaffolds:
+  baseline:
+    baseline: true
+    description: Baseline
+`))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if len(loaded.Models) != 2 {
+		t.Fatalf("Models length = %d, want 2", len(loaded.Models))
+	}
+	if loaded.Models[0].ID != "alpha_local" {
+		t.Fatalf("Models[0].ID = %q, want alpha_local", loaded.Models[0].ID)
+	}
+	if loaded.Models[1].ID != "zed_local" {
+		t.Fatalf("Models[1].ID = %q, want zed_local", loaded.Models[1].ID)
+	}
+
+	// Legacy runtime callers still get a primary Ollama model chosen by sorted model ID.
+	if loaded.Runtime.OLLAMAModel != "alpha:3b" {
+		t.Fatalf("Runtime.OLLAMAModel = %q, want alpha:3b", loaded.Runtime.OLLAMAModel)
+	}
+}
+
 func TestLoadRejectsEnabledNonOllamaModel(t *testing.T) {
 	path := writeManifest(t, `
 schema_version: 1
