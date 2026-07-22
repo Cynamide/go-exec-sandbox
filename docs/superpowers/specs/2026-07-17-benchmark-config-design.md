@@ -529,7 +529,7 @@ fixtures:
     format: yaml
 
 tasks:
-  release_note_digest:
+  release-note-digest:
     id: release-note-digest
     version: v1
     split: public_dev
@@ -585,7 +585,7 @@ tasks:
       process:
         enabled: false
 
-  support_escalation_summary:
+  support-escalation-summary:
     id: support-escalation-summary
     version: v1
     split: public_dev
@@ -654,7 +654,7 @@ tasks:
           - type: rubric
             fixture: support_escalation_process_rubric
 
-  repo_issue_fix:
+  repo-issue-fix:
     id: repo-issue-fix
     version: v1
     split: public_dev
@@ -725,7 +725,7 @@ tasks:
               - file.modified
               - command.executed
 
-  browser_checkout_investigation:
+  browser-checkout-investigation:
     id: browser-checkout-investigation
     version: v1
     split: gated_test
@@ -796,7 +796,7 @@ tasks:
             event: browser.action_taken
             at_least: 1
 
-  chart_anomaly_explanation:
+  chart-anomaly-explanation:
     id: chart-anomaly-explanation
     version: v1
     split: gated_test
@@ -1309,9 +1309,9 @@ These make leaderboard submissions, cached results, and benchmark-release evolut
 
 Reference semantics:
 
-- task map keys like `release_note_digest` are local manifest entry names
+- task map keys are stable manifest entry names and must match `tasks[*].id`
 - `tasks[*].id` is the canonical externally reported task ID
-- the loader should treat `tasks[*].id` as the reporting identity and the map key as an authoring convenience
+- matching the map key to `tasks[*].id` avoids split identity and keeps manifest validation deterministic
 
 ### `tasks[*].fewshot`
 
@@ -2407,7 +2407,7 @@ Resolution:
 
 Issue:
 
-- Judge-role wiring and few-shot sourcing were present in the schema but not yet enforced in validation rules.
+- Judge-role wiring and few-shot sourcing needed explicit validation rules.
 
 Resolution:
 

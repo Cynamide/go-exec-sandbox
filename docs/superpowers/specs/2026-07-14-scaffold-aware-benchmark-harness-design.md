@@ -141,7 +141,7 @@ If a report cannot show what a scaffold changed, it is not aligned with this pro
 
 ## README Positioning
 
-The README should lead with the scaffold-aware thesis, not with LeetCode-style framing.
+The README should lead with the scaffold-aware thesis and real workflow benchmark framing.
 
 Recommended positioning:
 
@@ -172,4 +172,3 @@ That is the strategic value proposition for labs and product teams.
 - How should scaffolds be represented in configuration?
 - How much of the initial reporting should be automatic versus human-reviewed?
 - Which task families can be graded reliably enough to launch first?
-
