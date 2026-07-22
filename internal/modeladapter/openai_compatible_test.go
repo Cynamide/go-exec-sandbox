@@ -3,6 +3,7 @@ package modeladapter
 import (
 	"context"
 	"io"
+	"math"
 	"net/http"
 	"strings"
 	"testing"
@@ -21,17 +22,17 @@ func TestOpenAICompatibleAdapterBuildsChatCompletionsRequest(t *testing.T) {
 
 	typedAdapter := adapter.(*openAICompatibleAdapter)
 	typedAdapter.httpClient = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-			if r.URL.Path != "/v1/chat/completions" {
-				t.Fatalf("path = %s", r.URL.Path)
-			}
-			if r.Method != http.MethodPost {
-				t.Fatalf("method = %s, want POST", r.Method)
-			}
-			return &http.Response{
-				StatusCode: http.StatusOK,
-				Header:     http.Header{"Content-Type": []string{"application/json"}},
-				Body:       io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"answer"}}]}`)),
-			}, nil
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("path = %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPost {
+			t.Fatalf("method = %s, want POST", r.Method)
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"answer"}}]}`)),
+		}, nil
 	})}
 
 	resp, err := adapter.Generate(context.Background(), ModelRequest{
@@ -62,27 +63,27 @@ func TestOpenAICompatibleAdapterUsesBearerAuthAndParams(t *testing.T) {
 
 	typedAdapter := adapter.(*openAICompatibleAdapter)
 	typedAdapter.httpClient = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-			if got := r.Header.Get("Authorization"); got != "Bearer secret-key" {
-				t.Fatalf("Authorization = %q, want bearer token", got)
+		if got := r.Header.Get("Authorization"); got != "Bearer secret-key" {
+			t.Fatalf("Authorization = %q, want bearer token", got)
+		}
+		if got := r.Header.Get("Content-Type"); got != "application/json" {
+			t.Fatalf("Content-Type = %q, want application/json", got)
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("ReadAll() error = %v", err)
+		}
+		gotBody := string(body)
+		for _, want := range []string{`"temperature":0.25`, `"max_tokens":128`} {
+			if !strings.Contains(gotBody, want) {
+				t.Fatalf("request body = %s, want substring %s", gotBody, want)
 			}
-			if got := r.Header.Get("Content-Type"); got != "application/json" {
-				t.Fatalf("Content-Type = %q, want application/json", got)
-			}
-			body, err := io.ReadAll(r.Body)
-			if err != nil {
-				t.Fatalf("ReadAll() error = %v", err)
-			}
-			gotBody := string(body)
-			for _, want := range []string{`"temperature":0.25`, `"max_tokens":128`} {
-				if !strings.Contains(gotBody, want) {
-					t.Fatalf("request body = %s, want substring %s", gotBody, want)
-				}
-			}
-			return &http.Response{
-				StatusCode: http.StatusOK,
-				Header:     http.Header{"Content-Type": []string{"application/json"}},
-				Body:       io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"answer"}}],"usage":{"prompt_tokens":11,"completion_tokens":7,"total_tokens":18}}`)),
-			}, nil
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"answer"}}],"usage":{"prompt_tokens":11,"completion_tokens":7,"total_tokens":18}}`)),
+		}, nil
 	})}
 
 	resp, err := adapter.Generate(context.Background(), ModelRequest{
@@ -122,14 +123,14 @@ func TestOpenAICompatibleAdapterAllowsUnsetAPIKeyEnv(t *testing.T) {
 
 	typedAdapter := adapter.(*openAICompatibleAdapter)
 	typedAdapter.httpClient = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-			if got := r.Header.Get("Authorization"); got != "" {
-				t.Fatalf("Authorization = %q, want empty", got)
-			}
-			return &http.Response{
-				StatusCode: http.StatusOK,
-				Header:     http.Header{"Content-Type": []string{"application/json"}},
-				Body:       io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"answer"}}]}`)),
-			}, nil
+		if got := r.Header.Get("Authorization"); got != "" {
+			t.Fatalf("Authorization = %q, want empty", got)
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"answer"}}]}`)),
+		}, nil
 	})}
 
 	if _, err := typedAdapter.Generate(context.Background(), ModelRequest{
@@ -152,17 +153,17 @@ func TestOpenAICompatibleAdapterHealthCheckUsesModelsEndpoint(t *testing.T) {
 
 	typedAdapter := adapter.(*openAICompatibleAdapter)
 	typedAdapter.httpClient = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-			if r.URL.Path != "/v1/models" {
-				t.Fatalf("path = %s, want /v1/models", r.URL.Path)
-			}
-			if r.Method != http.MethodGet {
-				t.Fatalf("method = %s, want GET", r.Method)
-			}
-			return &http.Response{
-				StatusCode: http.StatusOK,
-				Header:     http.Header{"Content-Type": []string{"application/json"}},
-				Body:       io.NopCloser(strings.NewReader(`{"data":[]}`)),
-			}, nil
+		if r.URL.Path != "/v1/models" {
+			t.Fatalf("path = %s, want /v1/models", r.URL.Path)
+		}
+		if r.Method != http.MethodGet {
+			t.Fatalf("method = %s, want GET", r.Method)
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"data":[]}`)),
+		}, nil
 	})}
 
 	if err := typedAdapter.HealthCheck(context.Background()); err != nil {
@@ -207,11 +208,11 @@ func TestOpenAICompatibleAdapterRejectsNon200Responses(t *testing.T) {
 
 	typedAdapter := adapter.(*openAICompatibleAdapter)
 	typedAdapter.httpClient = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-			return &http.Response{
-				StatusCode: http.StatusBadRequest,
-				Header:     http.Header{"Content-Type": []string{"text/plain"}},
-				Body:       io.NopCloser(strings.NewReader("bad request\n")),
-			}, nil
+		return &http.Response{
+			StatusCode: http.StatusBadRequest,
+			Header:     http.Header{"Content-Type": []string{"text/plain"}},
+			Body:       io.NopCloser(strings.NewReader("bad request\n")),
+		}, nil
 	})}
 
 	_, err = typedAdapter.Generate(context.Background(), ModelRequest{
@@ -235,24 +236,24 @@ func TestOpenAICompatibleAdapterPassesRequestBodyShape(t *testing.T) {
 
 	typedAdapter := adapter.(*openAICompatibleAdapter)
 	typedAdapter.httpClient = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-			body, err := io.ReadAll(r.Body)
-			if err != nil {
-				t.Fatalf("ReadAll() error = %v", err)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("ReadAll() error = %v", err)
+		}
+		got := string(body)
+		for _, want := range []string{
+			`"model":"local-model"`,
+			`"messages":[{"role":"system","content":"be precise"},{"role":"user","content":"hi"}]`,
+		} {
+			if !strings.Contains(got, want) {
+				t.Fatalf("request body = %s, want substring %s", got, want)
 			}
-			got := string(body)
-			for _, want := range []string{
-				`"model":"local-model"`,
-				`"messages":[{"role":"system","content":"be precise"},{"role":"user","content":"hi"}]`,
-			} {
-				if !strings.Contains(got, want) {
-					t.Fatalf("request body = %s, want substring %s", got, want)
-				}
-			}
-			return &http.Response{
-				StatusCode: http.StatusOK,
-				Header:     http.Header{"Content-Type": []string{"application/json"}},
-				Body:       io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"answer"}}]}`)),
-			}, nil
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"answer"}}]}`)),
+		}, nil
 	})}
 
 	if _, err := typedAdapter.Generate(context.Background(), ModelRequest{
@@ -320,4 +321,173 @@ func TestOpenAICompatibleAdapterRejectsInvalidMaxTokensParamType(t *testing.T) {
 	if err == nil {
 		t.Fatal("NewOpenAICompatibleAdapter() error = nil, want invalid max_tokens error")
 	}
+}
+
+func TestOpenAICompatibleAdapterRejectsOutOfRangeTemperatureParams(t *testing.T) {
+	for name, temperature := range map[string]float64{
+		"below minimum":     -0.1,
+		"above maximum":     2.1,
+		"NaN":               math.NaN(),
+		"positive infinity": math.Inf(1),
+		"negative infinity": math.Inf(-1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := NewOpenAICompatibleAdapter(Config{
+				ID:           "local",
+				ProviderKind: "openai_compatible",
+				BaseURL:      "http://openai.test/v1",
+				ModelName:    "local-model",
+				Params: map[string]any{
+					"temperature": temperature,
+				},
+			})
+			if err == nil {
+				t.Fatal("NewOpenAICompatibleAdapter() error = nil, want invalid temperature error")
+			}
+		})
+	}
+}
+
+func TestOpenAICompatibleAdapterRejectsInvalidMaxTokensValues(t *testing.T) {
+	for name, maxTokens := range map[string]any{
+		"negative":          -1,
+		"zero":              0,
+		"non-integer float": 1.5,
+		"outside int range": math.MaxFloat64,
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := NewOpenAICompatibleAdapter(Config{
+				ID:           "local",
+				ProviderKind: "openai_compatible",
+				BaseURL:      "http://openai.test/v1",
+				ModelName:    "local-model",
+				Params: map[string]any{
+					"max_tokens": maxTokens,
+				},
+			})
+			if err == nil {
+				t.Fatal("NewOpenAICompatibleAdapter() error = nil, want invalid max_tokens error")
+			}
+		})
+	}
+}
+
+func TestOpenAICompatibleAdapterRejectsInvalidBaseURL(t *testing.T) {
+	for name, baseURL := range map[string]string{
+		"relative":   "/v1",
+		"schemeless": "openai.test/v1",
+		"ftp":        "ftp://openai.test/v1",
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := NewOpenAICompatibleAdapter(Config{
+				ID:           "local",
+				ProviderKind: "openai_compatible",
+				BaseURL:      baseURL,
+				ModelName:    "local-model",
+			})
+			if err == nil {
+				t.Fatal("NewOpenAICompatibleAdapter() error = nil, want invalid base URL error")
+			}
+		})
+	}
+}
+
+func TestOpenAICompatibleAdapterRejectsUnsupportedConfigParam(t *testing.T) {
+	_, err := NewOpenAICompatibleAdapter(Config{
+		ID:           "local",
+		ProviderKind: "openai_compatible",
+		BaseURL:      "http://openai.test/v1",
+		ModelName:    "local-model",
+		Params: map[string]any{
+			"top_p": 0.9,
+		},
+	})
+	if err == nil {
+		t.Fatal("NewOpenAICompatibleAdapter() error = nil, want unsupported param error")
+	}
+	if !strings.Contains(err.Error(), "unsupported param \"top_p\"") {
+		t.Fatalf("NewOpenAICompatibleAdapter() error = %v, want unsupported top_p param error", err)
+	}
+}
+
+func TestOpenAICompatibleAdapterRejectsUnsupportedRequestParam(t *testing.T) {
+	adapter, err := NewOpenAICompatibleAdapter(Config{
+		ID:           "local",
+		ProviderKind: "openai_compatible",
+		BaseURL:      "http://openai.test/v1",
+		ModelName:    "local-model",
+	})
+	if err != nil {
+		t.Fatalf("NewOpenAICompatibleAdapter() error = %v", err)
+	}
+
+	_, err = adapter.Generate(context.Background(), ModelRequest{
+		Messages: []Message{{Role: "user", Content: "hi"}},
+		Params: map[string]any{
+			"foo": "bar",
+		},
+	})
+	if err == nil {
+		t.Fatal("Generate() error = nil, want unsupported param error")
+	}
+	if !strings.Contains(err.Error(), "unsupported param \"foo\"") {
+		t.Fatalf("Generate() error = %v, want unsupported foo param error", err)
+	}
+}
+
+func TestOpenAICompatibleAdapterParsesToolCallsWithNullContent(t *testing.T) {
+	adapter, err := NewOpenAICompatibleAdapter(Config{
+		ID:           "local",
+		ProviderKind: "openai_compatible",
+		BaseURL:      "http://openai.test/v1",
+		ModelName:    "local-model",
+	})
+	if err != nil {
+		t.Fatalf("NewOpenAICompatibleAdapter() error = %v", err)
+	}
+
+	typedAdapter := adapter.(*openAICompatibleAdapter)
+	typedAdapter.httpClient = &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body: io.NopCloser(strings.NewReader(`{
+				"choices": [{
+					"message": {
+						"content": null,
+						"tool_calls": [{
+							"id": "call_1",
+							"function": {"name": "lookup", "arguments": "{\"query\":\"weather\"}"}
+						}]
+					}
+				}]
+			}`)),
+		}, nil
+	})}
+
+	response, err := adapter.Generate(context.Background(), ModelRequest{
+		Messages: []Message{{Role: "user", Content: "hi"}},
+	})
+	if err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+	if response.Text != "" {
+		t.Fatalf("Text = %q, want empty", response.Text)
+	}
+	wantToolCalls := []ToolCall{{ID: "call_1", Name: "lookup", Arguments: `{"query":"weather"}`}}
+	if !equalToolCalls(response.ToolCalls, wantToolCalls) {
+		t.Fatalf("ToolCalls = %#v, want %#v", response.ToolCalls, wantToolCalls)
+	}
+}
+
+func equalToolCalls(got, want []ToolCall) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for index := range got {
+		if got[index] != want[index] {
+			return false
+		}
+	}
+	return true
 }

@@ -174,3 +174,39 @@ ok      gexec-sandbox/internal/middleware     (cached)
 ok      gexec-sandbox/internal/modeladapter   (cached)
 ok      gexec-sandbox/internal/sandbox        (cached)
 ```
+
+---
+
+## Task 5 Re-Review Fix Pass (July 22, 2026)
+
+### Scope fixed
+
+- Rejected unsupported OpenAI-compatible adapter params at construction time.
+- Rejected unsupported per-request params before request JSON generation.
+- Parsed chat-completions responses where `message.content` is `null` and tool calls are present.
+- Tightened `temperature` validation to reject non-finite and out-of-range values.
+- Tightened `max_tokens` validation to reject non-positive, non-integral, and out-of-range values.
+- Rejected relative, schemeless, and non-HTTP(S) base URLs during adapter construction.
+
+### Verification
+
+Command:
+
+```bash
+GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/modeladapter
+```
+
+Output:
+
+```text
+ok  	gexec-sandbox/internal/modeladapter	(cached)
+```
+
+### Files changed
+
+- `internal/modeladapter/openai_compatible.go`
+- `internal/modeladapter/openai_compatible_test.go`
+
+### Concerns
+
+- None for this fix pass.
