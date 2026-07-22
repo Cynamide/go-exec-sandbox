@@ -71,3 +71,22 @@ ok  	gexec-sandbox/internal/modeladapter	0.480s
 ## Any concerns
 
 - `Config.Validate()` currently enforces only the minimum safe fields for this task. Additional validation for provider kind, mappings, auth env vars, and capability compatibility should remain in later tasks so we do not front-run planned behavior changes.
+
+## Task 1 Review Follow-up: Missing ID Coverage
+
+Command:
+
+```bash
+GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/modeladapter -run 'TestConfigRequires(ID|ModelName)$' -count=1
+```
+
+Output:
+
+```text
+ok  	gexec-sandbox/internal/modeladapter	0.420s
+```
+
+Notes:
+
+- Added focused regression coverage for `Config.Validate()` when `ID` is missing.
+- No production code changes were needed because the validation branch already existed and passed once covered.
