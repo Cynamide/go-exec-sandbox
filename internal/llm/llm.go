@@ -28,7 +28,7 @@ func NewClient() (*Client, error) {
 func NewClientWithConfig(cfg config.Config) (*Client, error) {
 	adapter, err := modeladapter.NewOllamaAdapter(ollamaAdapterConfig(cfg))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Ollama client: %w", err)
+		return nil, fmt.Errorf("failed to create Ollama adapter: %w", err)
 	}
 	return &Client{adapter: adapter}, nil
 }
@@ -68,7 +68,7 @@ func WaitForOllama(ctx context.Context) error {
 func WaitForOllamaWithConfig(ctx context.Context, cfg config.Config) error {
 	adapter, err := modeladapter.NewOllamaAdapter(ollamaAdapterConfig(cfg))
 	if err != nil {
-		return fmt.Errorf("failed to create Ollama client: %w", err)
+		return fmt.Errorf("failed to create Ollama adapter: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)

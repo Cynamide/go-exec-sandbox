@@ -86,3 +86,29 @@ func TestWaitForOllamaWithConfigAllowsEmptyModelWithExplicitHost(t *testing.T) {
 		t.Fatalf("WaitForOllamaWithConfig() error = %v, want %v", err, context.Canceled)
 	}
 }
+
+func TestNewClientWithConfigReportsAdapterConstructionFailures(t *testing.T) {
+	_, err := NewClientWithConfig(config.Config{
+		OLLAMAHost: "://bad-url",
+	})
+	if err == nil {
+		t.Fatal("NewClientWithConfig() error = nil, want non-nil")
+	}
+
+	if got := err.Error(); !strings.Contains(got, "failed to create Ollama adapter") {
+		t.Fatalf("NewClientWithConfig() error = %q, want it to mention adapter construction", got)
+	}
+}
+
+func TestWaitForOllamaWithConfigReportsAdapterConstructionFailures(t *testing.T) {
+	err := WaitForOllamaWithConfig(context.Background(), config.Config{
+		OLLAMAHost: "://bad-url",
+	})
+	if err == nil {
+		t.Fatal("WaitForOllamaWithConfig() error = nil, want non-nil")
+	}
+
+	if got := err.Error(); !strings.Contains(got, "failed to create Ollama adapter") {
+		t.Fatalf("WaitForOllamaWithConfig() error = %q, want it to mention adapter construction", got)
+	}
+}

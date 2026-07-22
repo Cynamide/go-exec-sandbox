@@ -116,3 +116,38 @@ What changed:
 - Preserved host-only `llm.NewClientWithConfig` construction by giving the Ollama adapter a stable fallback ID when `OLLAMAModel` is empty.
 - Relaxed Ollama adapter construction to validate adapter identity and provider kind without requiring a model up front.
 - Kept generation behind `modeladapter.Adapter` and added an explicit runtime guard so chat generation still fails clearly if no model name is configured.
+
+## Task 2 Minor Review Finding Follow-up
+
+Reviewer finding addressed:
+
+- `internal/llm/llm.go` wrapped model adapter construction failures with `failed to create Ollama client`, which was misleading after the adapter seam landed.
+
+Change made:
+
+- Updated only the adapter-construction wrappers in `NewClientWithConfig` and `WaitForOllamaWithConfig` to say `failed to create Ollama adapter`.
+- Left the real Ollama API client error wording in `PullModel`, `CheckModelExists`, and `ollamaAPIClient` paths unchanged.
+
+Focused regression coverage:
+
+- Added `TestNewClientWithConfigReportsAdapterConstructionFailures`.
+- Added `TestWaitForOllamaWithConfigReportsAdapterConstructionFailures`.
+
+Test evidence:
+
+```bash
+GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/llm -run 'Test(NewClientWithConfigReportsAdapterConstructionFailures|WaitForOllamaWithConfigReportsAdapterConstructionFailures)$'
+```
+
+```text
+ok  	gexec-sandbox/internal/llm	0.454s
+```
+
+```bash
+GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/llm ./internal/modeladapter
+```
+
+```text
+ok  	gexec-sandbox/internal/llm	0.751s
+ok  	gexec-sandbox/internal/modeladapter	(cached)
+```
