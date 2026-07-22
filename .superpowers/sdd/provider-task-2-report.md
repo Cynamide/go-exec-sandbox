@@ -151,3 +151,41 @@ GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/llm ./internal
 ok  	gexec-sandbox/internal/llm	0.751s
 ok  	gexec-sandbox/internal/modeladapter	(cached)
 ```
+
+## Task 2 Minor Review Finding Follow-up: Ollama HealthCheck Seam (July 22, 2026)
+
+Reviewer finding addressed:
+
+- The host-only `WaitForOllamaWithConfig` regression covered adapter construction under cancellation, but it did not directly prove the Ollama adapter's `HealthCheck` path.
+
+Change made:
+
+- Added `TestOllamaAdapterHealthCheckUsesListEndpoint` in `internal/modeladapter/ollama_test.go`.
+- The test stays at the seam level by exercising `ollamaAdapter.HealthCheck` with a stubbed Ollama API client transport and asserting it issues `GET /api/tags`.
+
+TDD note:
+
+- This was a coverage-only follow-up on an already-correct code path, so there was no legitimate missing-behavior red case to drive out in production code.
+- The first attempted red used `httptest.NewServer` and failed because the sandbox disallows binding a local listener.
+- The final in-process seam test then went green once the package-local test harness was wired correctly.
+
+Focused test evidence:
+
+```bash
+GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/modeladapter -run 'TestOllamaAdapterHealthCheckUsesListEndpoint$'
+```
+
+```text
+ok  	gexec-sandbox/internal/modeladapter	0.364s
+```
+
+Required package verification:
+
+```bash
+GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/modeladapter ./internal/llm
+```
+
+```text
+ok  	gexec-sandbox/internal/modeladapter	0.550s
+ok  	gexec-sandbox/internal/llm	(cached)
+```
