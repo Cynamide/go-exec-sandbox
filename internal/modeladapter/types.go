@@ -3,6 +3,7 @@ package modeladapter
 import (
 	"context"
 	"fmt"
+	"strings"
 )
 
 type Message struct {
@@ -109,7 +110,7 @@ func ValidateMappings(cfg Config) error {
 		missing = append(missing, "response_mapping.text_path")
 	}
 	if len(missing) > 0 {
-		return fmt.Errorf("model adapter config %q custom_http provider requires %s", cfg.ID, missing)
+		return fmt.Errorf("model adapter config %q custom_http provider requires %s", cfg.ID, strings.Join(missing, ", "))
 	}
 
 	return nil

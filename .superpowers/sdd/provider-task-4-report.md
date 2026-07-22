@@ -118,3 +118,57 @@ ok  	gexec-sandbox/internal/sandbox	(cached)
 ## Any concerns
 
 - The mapping schema is now aligned to the plan for `custom_http`, but it is not backward-compatible with the earlier placeholder field names. That is acceptable in the current branch because those fields were shells and the repo test suite is green, but Task 5 should build directly on this schema rather than reintroducing compatibility aliases.
+
+## 2026-07-22 Task 4 Review Follow-up
+
+### Scope
+
+- Fixed the `custom_http` missing-mapping error text in `internal/modeladapter/types.go` so required fields are rendered as a comma-separated list.
+- Added a focused regression test for that clean error text in `internal/modeladapter/types_test.go`.
+- Added a manifest regression test proving a fully mapped `custom_http` model is still rejected as unsupported by the current runtime in `internal/manifest/manifest_test.go`.
+- Clarified in the main manifest success test that Ollama models may carry transport mappings even though current supported Ollama execution ignores them.
+
+### RED
+
+Command:
+
+```bash
+GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/modeladapter ./internal/manifest
+```
+
+Output:
+
+```text
+--- FAIL: TestCustomHTTPProviderMissingMappingsErrorListsFields (0.00s)
+    types_test.go:54: ValidateMappings() error = "model adapter config \"custom\" custom_http provider requires [request_mapping.path request_mapping.body_template response_mapping.text_path]", want "model adapter config \"custom\" custom_http provider requires request_mapping.path, request_mapping.body_template, response_mapping.text_path"
+FAIL
+FAIL	gexec-sandbox/internal/modeladapter	0.517s
+ok  	gexec-sandbox/internal/manifest	0.842s
+FAIL
+```
+
+Why this was the right failure:
+
+- The new modeladapter test failed on the exact broken formatting called out in review.
+- The new manifest regression already passed in RED, which is desirable here because current runtime rejection of fully mapped `custom_http` models was already correct and needed to stay that way.
+
+### GREEN
+
+Command:
+
+```bash
+GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/modeladapter ./internal/manifest
+```
+
+Output:
+
+```text
+ok  	gexec-sandbox/internal/modeladapter	0.319s
+ok  	gexec-sandbox/internal/manifest	0.594s
+```
+
+### Files touched for this follow-up
+
+- `internal/modeladapter/types.go`
+- `internal/modeladapter/types_test.go`
+- `internal/manifest/manifest_test.go`

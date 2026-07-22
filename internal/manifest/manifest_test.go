@@ -212,6 +212,8 @@ scaffolds:
 	if got := model.Params["max_tokens"]; got != 2048 {
 		t.Fatalf("model.Params[max_tokens] = %#v, want 2048", got)
 	}
+	// Transport-oriented mappings are preserved from the manifest for future runtimes,
+	// even though supported Ollama execution ignores them today.
 	if model.RequestMapping.Method != "POST" {
 		t.Fatalf("model.RequestMapping.Method = %q, want POST", model.RequestMapping.Method)
 	}
@@ -359,6 +361,49 @@ scaffolds:
 		t.Fatal("Load() error = nil, want missing mapping error")
 	} else if !strings.Contains(err.Error(), "mapping") {
 		t.Fatalf("Load() error = %v, want mapping-specific error", err)
+	}
+}
+
+func TestLoadRejectsCustomHTTPModelEvenWithCompleteMappings(t *testing.T) {
+	path := writeManifest(t, `
+schema_version: 1
+providers:
+  custom_provider:
+    kind: custom_http
+    base_url: http://localhost:8080
+models:
+  custom_model:
+    provider: custom_provider
+    model_name: custom-model
+    enabled: true
+    request_mapping:
+      method: POST
+      path: /v1/chat/completions
+      body_template: '{"model":"{{model}}","messages":{{messages}}}'
+    response_mapping:
+      text_path: choices[0].message.content
+      tool_calls_path: choices[0].message.tool_calls
+      usage_path: usage
+tasks:
+  task:
+    id: task
+    title: Task
+    description: Desc
+    family: support_workflows
+    language: python
+    test_cases:
+      - input: ""
+        expected_output: ok
+scaffolds:
+  baseline:
+    baseline: true
+    description: Baseline
+`)
+
+	if _, err := Load(path); err == nil {
+		t.Fatal("Load() error = nil, want unsupported provider error")
+	} else if !strings.Contains(err.Error(), `provider kind "custom_http" is not supported by the current runtime`) {
+		t.Fatalf("Load() error = %v, want unsupported custom_http runtime error", err)
 	}
 }
 

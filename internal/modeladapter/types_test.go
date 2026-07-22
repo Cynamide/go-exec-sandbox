@@ -1,6 +1,7 @@
 package modeladapter_test
 
 import (
+	"strings"
 	"testing"
 
 	"gexec-sandbox/internal/modeladapter"
@@ -30,5 +31,29 @@ func TestCustomHTTPProviderRequiresMappings(t *testing.T) {
 
 	if err := modeladapter.ValidateMappings(cfg); err == nil {
 		t.Fatal("ValidateMappings() error = nil, want missing mapping error")
+	}
+}
+
+func TestCustomHTTPProviderMissingMappingsErrorListsFields(t *testing.T) {
+	cfg := modeladapter.Config{
+		ID:           "custom",
+		ProviderKind: "custom_http",
+		ModelName:    "custom-model",
+		RequestMapping: modeladapter.RequestMapping{
+			Method: "POST",
+		},
+	}
+
+	err := modeladapter.ValidateMappings(cfg)
+	if err == nil {
+		t.Fatal("ValidateMappings() error = nil, want missing mapping error")
+	}
+
+	want := `model adapter config "custom" custom_http provider requires request_mapping.path, request_mapping.body_template, response_mapping.text_path`
+	if err.Error() != want {
+		t.Fatalf("ValidateMappings() error = %q, want %q", err.Error(), want)
+	}
+	if strings.Contains(err.Error(), "%!s") {
+		t.Fatalf("ValidateMappings() error = %q, want clean formatting", err.Error())
 	}
 }
