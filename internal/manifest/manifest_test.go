@@ -113,6 +113,132 @@ scaffolds:
 	}
 }
 
+func TestLoadReturnsEnabledModelAdapterConfigsAndDefaultRoles(t *testing.T) {
+	t.Setenv("OLLAMA_TEST_HOST", "http://ollama.test:11434")
+
+	loaded, err := Load(writeManifest(t, `
+schema_version: 1
+providers:
+  ollama_local:
+    kind: ollama
+    base_url: http://localhost:11434
+    base_url_env: OLLAMA_TEST_HOST
+    api_key_env: OLLAMA_API_KEY
+  openai_api:
+    kind: openai
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+models:
+  qwen_local:
+    provider: ollama_local
+    model_name: qwen3:4b
+    enabled: true
+    params:
+      temperature: 0
+      max_tokens: 2048
+    request_mapping:
+      messages_field: messages
+      temperature_field: temperature
+      max_tokens_field: max_tokens
+      model_field: model
+    response_mapping:
+      text_path: choices[0].message.content
+      finish_reason_path: choices[0].finish_reason
+      usage_prompt_tokens_path: usage.prompt_tokens
+      usage_completion_tokens_path: usage.completion_tokens
+    capabilities:
+      tool_use: false
+      file_editing: false
+      browser: true
+      multimodal: true
+      visual_reasoning: true
+      terminal_session: true
+      spreadsheet: false
+      notebook: false
+      conversation: true
+      structured_output: true
+      judge: true
+  disabled_remote:
+    provider: openai_api
+    model_name: gpt-5.4-mini
+    enabled: false
+default_model_roles:
+  judge: qwen_local
+  planner: qwen_local
+tasks:
+  task:
+    id: task
+    title: Task
+    description: Desc
+    family: support_workflows
+    language: python
+    test_cases:
+      - input: ""
+        expected_output: ok
+scaffolds:
+  baseline:
+    baseline: true
+    description: Baseline
+`))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if len(loaded.Models) != 1 {
+		t.Fatalf("Models length = %d, want 1", len(loaded.Models))
+	}
+
+	model := loaded.Models[0]
+	if model.ID != "qwen_local" {
+		t.Fatalf("model.ID = %q, want qwen_local", model.ID)
+	}
+	if model.ProviderID != "ollama_local" {
+		t.Fatalf("model.ProviderID = %q, want ollama_local", model.ProviderID)
+	}
+	if model.ProviderKind != "ollama" {
+		t.Fatalf("model.ProviderKind = %q, want ollama", model.ProviderKind)
+	}
+	if model.ModelName != "qwen3:4b" {
+		t.Fatalf("model.ModelName = %q, want qwen3:4b", model.ModelName)
+	}
+	if model.BaseURL != "http://ollama.test:11434" {
+		t.Fatalf("model.BaseURL = %q, want env override", model.BaseURL)
+	}
+	if model.APIKeyEnv != "OLLAMA_API_KEY" {
+		t.Fatalf("model.APIKeyEnv = %q, want OLLAMA_API_KEY", model.APIKeyEnv)
+	}
+	if got := model.Params["temperature"]; got != 0 {
+		t.Fatalf("model.Params[temperature] = %#v, want 0", got)
+	}
+	if got := model.Params["max_tokens"]; got != 2048 {
+		t.Fatalf("model.Params[max_tokens] = %#v, want 2048", got)
+	}
+	if model.RequestMapping.MessagesField != "messages" {
+		t.Fatalf("model.RequestMapping.MessagesField = %q, want messages", model.RequestMapping.MessagesField)
+	}
+	if model.RequestMapping.ModelField != "model" {
+		t.Fatalf("model.RequestMapping.ModelField = %q, want model", model.RequestMapping.ModelField)
+	}
+	if model.ResponseMapping.TextPath != "choices[0].message.content" {
+		t.Fatalf("model.ResponseMapping.TextPath = %q, want choices[0].message.content", model.ResponseMapping.TextPath)
+	}
+	if model.ResponseMapping.UsageCompletionTokensPath != "usage.completion_tokens" {
+		t.Fatalf("model.ResponseMapping.UsageCompletionTokensPath = %q, want usage.completion_tokens", model.ResponseMapping.UsageCompletionTokensPath)
+	}
+	if !model.Capabilities.Browser || !model.Capabilities.Multimodal || !model.Capabilities.VisualReasoning || !model.Capabilities.TerminalSession || !model.Capabilities.Conversation || !model.Capabilities.StructuredOutput || !model.Capabilities.Judge {
+		t.Fatalf("model.Capabilities = %+v, want declared capabilities", model.Capabilities)
+	}
+	if model.Capabilities.ToolUse || model.Capabilities.FileEditing || model.Capabilities.Spreadsheet || model.Capabilities.Notebook {
+		t.Fatalf("model.Capabilities = %+v, want disabled capabilities to remain false", model.Capabilities)
+	}
+	if got := loaded.DefaultModelRoles["judge"]; got != "qwen_local" {
+		t.Fatalf("DefaultModelRoles[judge] = %q, want qwen_local", got)
+	}
+	if got := loaded.DefaultModelRoles["planner"]; got != "qwen_local" {
+		t.Fatalf("DefaultModelRoles[planner] = %q, want qwen_local", got)
+	}
+}
+
 func TestLoadRejectsEnabledNonOllamaModel(t *testing.T) {
 	path := writeManifest(t, `
 schema_version: 1
@@ -142,6 +268,76 @@ scaffolds:
 
 	if _, err := Load(path); err == nil {
 		t.Fatal("Load() error = nil, want unsupported provider error")
+	}
+}
+
+func TestLoadRejectsDefaultRoleForUnknownModel(t *testing.T) {
+	path := writeManifest(t, `
+schema_version: 1
+providers:
+  ollama_local:
+    kind: ollama
+models:
+  qwen_local:
+    provider: ollama_local
+    model_name: qwen3:4b
+    enabled: true
+default_model_roles:
+  judge: missing_model
+tasks:
+  task:
+    id: task
+    title: Task
+    description: Desc
+    family: support_workflows
+    language: python
+    test_cases:
+      - input: ""
+        expected_output: ok
+scaffolds:
+  baseline:
+    baseline: true
+    description: Baseline
+`)
+
+	if _, err := Load(path); err == nil {
+		t.Fatal("Load() error = nil, want unknown default role model error")
+	}
+}
+
+func TestLoadRejectsJudgeRoleWithoutJudgeCapability(t *testing.T) {
+	path := writeManifest(t, `
+schema_version: 1
+providers:
+  ollama_local:
+    kind: ollama
+models:
+  qwen_local:
+    provider: ollama_local
+    model_name: qwen3:4b
+    enabled: true
+    capabilities:
+      judge: false
+default_model_roles:
+  judge: qwen_local
+tasks:
+  task:
+    id: task
+    title: Task
+    description: Desc
+    family: support_workflows
+    language: python
+    test_cases:
+      - input: ""
+        expected_output: ok
+scaffolds:
+  baseline:
+    baseline: true
+    description: Baseline
+`)
+
+	if _, err := Load(path); err == nil {
+		t.Fatal("Load() error = nil, want judge capability error")
 	}
 }
 

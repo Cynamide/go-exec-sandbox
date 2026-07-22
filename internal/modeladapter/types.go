@@ -38,14 +38,32 @@ type Adapter interface {
 	HealthCheck(ctx context.Context) error
 }
 
-type RequestMapping struct{}
+type RequestMapping struct {
+	MessagesField    string `yaml:"messages_field"`
+	TemperatureField string `yaml:"temperature_field"`
+	MaxTokensField   string `yaml:"max_tokens_field"`
+	ModelField       string `yaml:"model_field"`
+}
 
-type ResponseMapping struct{}
+type ResponseMapping struct {
+	TextPath                  string `yaml:"text_path"`
+	FinishReasonPath          string `yaml:"finish_reason_path"`
+	UsagePromptTokensPath     string `yaml:"usage_prompt_tokens_path"`
+	UsageCompletionTokensPath string `yaml:"usage_completion_tokens_path"`
+}
 
 type Capabilities struct {
-	Judge      bool
-	Browser    bool
-	Multimodal bool
+	ToolUse          bool `yaml:"tool_use"`
+	FileEditing      bool `yaml:"file_editing"`
+	Browser          bool `yaml:"browser"`
+	Multimodal       bool `yaml:"multimodal"`
+	VisualReasoning  bool `yaml:"visual_reasoning"`
+	TerminalSession  bool `yaml:"terminal_session"`
+	Spreadsheet      bool `yaml:"spreadsheet"`
+	Notebook         bool `yaml:"notebook"`
+	Conversation     bool `yaml:"conversation"`
+	StructuredOutput bool `yaml:"structured_output"`
+	Judge            bool `yaml:"judge"`
 }
 
 type Config struct {

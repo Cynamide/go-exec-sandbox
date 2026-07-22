@@ -10,24 +10,28 @@ import (
 
 	"gexec-sandbox/internal/benchmark"
 	"gexec-sandbox/internal/config"
+	"gexec-sandbox/internal/modeladapter"
 	"gopkg.in/yaml.v3"
 )
 
 var ErrInvalidManifest = errors.New("invalid benchmark manifest")
 
 type Loaded struct {
-	Runtime   config.Config
-	Tasks     benchmark.TaskCatalog
-	Scaffolds benchmark.ScaffoldCatalog
+	Runtime           config.Config
+	Models            []modeladapter.Config
+	DefaultModelRoles map[string]string
+	Tasks             benchmark.TaskCatalog
+	Scaffolds         benchmark.ScaffoldCatalog
 }
 
 type file struct {
-	SchemaVersion   int                 `yaml:"schema_version"`
-	RuntimeDefaults runtimeDefaults     `yaml:"runtime_defaults"`
-	Providers       map[string]provider `yaml:"providers"`
-	Models          map[string]model    `yaml:"models"`
-	Tasks           map[string]task     `yaml:"tasks"`
-	Scaffolds       map[string]scaffold `yaml:"scaffolds"`
+	SchemaVersion     int                 `yaml:"schema_version"`
+	RuntimeDefaults   runtimeDefaults     `yaml:"runtime_defaults"`
+	Providers         map[string]provider `yaml:"providers"`
+	Models            map[string]model    `yaml:"models"`
+	DefaultModelRoles map[string]string   `yaml:"default_model_roles"`
+	Tasks             map[string]task     `yaml:"tasks"`
+	Scaffolds         map[string]scaffold `yaml:"scaffolds"`
 }
 
 type runtimeDefaults struct {
@@ -38,12 +42,17 @@ type provider struct {
 	Kind       string `yaml:"kind"`
 	BaseURL    string `yaml:"base_url"`
 	BaseURLEnv string `yaml:"base_url_env"`
+	APIKeyEnv  string `yaml:"api_key_env"`
 }
 
 type model struct {
-	Provider  string `yaml:"provider"`
-	ModelName string `yaml:"model_name"`
-	Enabled   bool   `yaml:"enabled"`
+	Provider        string                       `yaml:"provider"`
+	ModelName       string                       `yaml:"model_name"`
+	Enabled         bool                         `yaml:"enabled"`
+	Params          map[string]any               `yaml:"params"`
+	RequestMapping  modeladapter.RequestMapping  `yaml:"request_mapping"`
+	ResponseMapping modeladapter.ResponseMapping `yaml:"response_mapping"`
+	Capabilities    modeladapter.Capabilities    `yaml:"capabilities"`
 }
 
 type task struct {
@@ -88,6 +97,15 @@ func Load(path string) (Loaded, error) {
 		return Loaded{}, err
 	}
 
+	models, err := manifest.modelConfigs()
+	if err != nil {
+		return Loaded{}, err
+	}
+	defaultRoles, err := manifest.defaultModelRoles(models)
+	if err != nil {
+		return Loaded{}, err
+	}
+
 	tasks, err := manifest.taskCatalog()
 	if err != nil {
 		return Loaded{}, err
@@ -99,9 +117,11 @@ func Load(path string) (Loaded, error) {
 	}
 
 	return Loaded{
-		Runtime:   runtime,
-		Tasks:     tasks,
-		Scaffolds: scaffolds,
+		Runtime:           runtime,
+		Models:            models,
+		DefaultModelRoles: defaultRoles,
+		Tasks:             tasks,
+		Scaffolds:         scaffolds,
 	}, nil
 }
 
@@ -135,6 +155,71 @@ func (m file) runtimeConfig() (config.Config, error) {
 	}, nil
 }
 
+func (m file) modelConfigs() ([]modeladapter.Config, error) {
+	names := sortedKeys(m.Models)
+	models := make([]modeladapter.Config, 0, len(names))
+	for _, name := range names {
+		candidate := m.Models[name]
+		if !candidate.Enabled {
+			continue
+		}
+		if candidate.ModelName == "" {
+			return nil, fmt.Errorf("%w: model %q missing model_name", ErrInvalidManifest, name)
+		}
+
+		providerConfig, ok := m.Providers[candidate.Provider]
+		if !ok {
+			return nil, fmt.Errorf("%w: model %q references unknown provider %q", ErrInvalidManifest, name, candidate.Provider)
+		}
+		if providerConfig.Kind != "ollama" {
+			return nil, fmt.Errorf("%w: provider kind %q is not supported by the current runtime", ErrInvalidManifest, providerConfig.Kind)
+		}
+
+		cfg := modeladapter.Config{
+			ID:              name,
+			ProviderID:      candidate.Provider,
+			ProviderKind:    providerConfig.Kind,
+			ModelName:       candidate.ModelName,
+			BaseURL:         resolveBaseURL(providerConfig),
+			APIKeyEnv:       providerConfig.APIKeyEnv,
+			Params:          copyAnyMap(candidate.Params),
+			RequestMapping:  candidate.RequestMapping,
+			ResponseMapping: candidate.ResponseMapping,
+			Capabilities:    candidate.Capabilities,
+		}
+		if err := cfg.Validate(); err != nil {
+			return nil, err
+		}
+		models = append(models, cfg)
+	}
+	return models, nil
+}
+
+func (m file) defaultModelRoles(models []modeladapter.Config) (map[string]string, error) {
+	if len(m.DefaultModelRoles) == 0 {
+		return nil, nil
+	}
+
+	modelByID := make(map[string]modeladapter.Config, len(models))
+	for _, model := range models {
+		modelByID[model.ID] = model
+	}
+
+	resolved := make(map[string]string, len(m.DefaultModelRoles))
+	for role, modelID := range m.DefaultModelRoles {
+		model, ok := modelByID[modelID]
+		if !ok {
+			return nil, fmt.Errorf("%w: default_model_roles.%s references unknown enabled model %q", ErrInvalidManifest, role, modelID)
+		}
+		if role == "judge" && !model.Capabilities.Judge {
+			return nil, fmt.Errorf("%w: default_model_roles.judge requires model %q to declare capabilities.judge", ErrInvalidManifest, modelID)
+		}
+		resolved[role] = modelID
+	}
+
+	return resolved, nil
+}
+
 func (m file) ollamaSelection() (string, string, error) {
 	enabledModelName := ""
 	enabledProvider := provider{}
@@ -163,17 +248,22 @@ func (m file) ollamaSelection() (string, string, error) {
 		return "", "", fmt.Errorf("%w: exactly one enabled ollama model is required", ErrInvalidManifest)
 	}
 
-	ollamaHost := enabledProvider.BaseURL
-	if enabledProvider.BaseURLEnv != "" {
-		if value := os.Getenv(enabledProvider.BaseURLEnv); value != "" {
-			ollamaHost = value
-		}
-	}
+	ollamaHost := resolveBaseURL(enabledProvider)
 	if ollamaHost == "" {
 		ollamaHost = "http://localhost:11434"
 	}
 
 	return enabledModelName, ollamaHost, nil
+}
+
+func resolveBaseURL(p provider) string {
+	baseURL := p.BaseURL
+	if p.BaseURLEnv != "" {
+		if value := os.Getenv(p.BaseURLEnv); value != "" {
+			baseURL = value
+		}
+	}
+	return baseURL
 }
 
 func (m file) taskCatalog() (benchmark.TaskCatalog, error) {
@@ -243,4 +333,26 @@ func sortedKeys[V any](items map[string]V) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func copyAnyMap(source map[string]any) map[string]any {
+	if len(source) == 0 {
+		return nil
+	}
+	cloned := make(map[string]any, len(source))
+	for key, value := range source {
+		cloned[key] = value
+	}
+	return cloned
+}
+
+func copyStringMap(source map[string]string) map[string]string {
+	if len(source) == 0 {
+		return nil
+	}
+	cloned := make(map[string]string, len(source))
+	for key, value := range source {
+		cloned[key] = value
+	}
+	return cloned
 }
