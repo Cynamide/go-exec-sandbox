@@ -4,7 +4,7 @@
 
 **Goal:** Expand reports and traces to include benchmark metadata, run identity, model/sample/fixture/task-mode data, artifacts, per-check grades, process evidence, and lift summaries.
 
-**Architecture:** Extend `benchmark.Run` and `BenchmarkReport` with additive fields. Keep published JSON fields stable. Add trace/artifact structures and deterministic report ordering.
+**Architecture:** Extend `benchmark.Run` and `BenchmarkReport` with additive fields. Keep published JSON fields stable. Add trace, artifact reference, redaction policy, and deterministic report ordering structures.
 
 **Tech Stack:** Go, JSON structs, deterministic sorting, table-driven tests.
 
@@ -69,7 +69,7 @@ git commit -m "Add structured run identity"
 - Modify: `internal/benchmark/model.go`
 
 **Interfaces:**
-- Produces: `TraceEvent`, `CapturedArtifact`, `ArtifactChannel`
+- Produces: `TraceEvent`, `CapturedArtifact`, `ArtifactRef`, `ArtifactChannel`, `RedactionPolicy`
 - Consumes: runner and grading outputs
 
 - [ ] **Step 1: Write the failing test**
@@ -90,7 +90,7 @@ Expected: FAIL because captured artifacts are undefined.
 
 - [ ] **Step 3: Implement models**
 
-Support stdout, stderr, exit code, git diff, generated files, browser state, screenshot, notebook state, spreadsheet state, attachments, model outputs, and trace events.
+Support stdout, stderr, exit code, git diff, generated files, browser state, screenshot, notebook state, spreadsheet state, attachments, model outputs, and trace events. `TraceEvent` includes timestamp, name, source, payload, and redaction policy. `ArtifactRef` points to stored artifacts without embedding large payloads in reports.
 
 - [ ] **Step 4: Run tests**
 
@@ -157,7 +157,7 @@ git commit -m "Report grading check results"
 
 **Interfaces:**
 - Consumes: runtime capture config
-- Produces: sanitized deterministic report
+- Produces: sanitized deterministic report with applied `RedactionPolicy`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -178,7 +178,7 @@ Expected: FAIL because `SanitizeReport` is undefined.
 
 - [ ] **Step 3: Implement sanitization**
 
-Omit or redact fields disabled by capture config and sort runs, scaffolds, family summaries, metrics, and artifacts deterministically.
+Omit or redact fields disabled by capture config, apply per-event and per-artifact `RedactionPolicy`, and sort runs, scaffolds, family summaries, metrics, and artifacts deterministically.
 
 - [ ] **Step 4: Run tests**
 

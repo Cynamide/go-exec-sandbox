@@ -4,7 +4,7 @@
 
 **Goal:** Add a solver seam so scaffold-aware comparisons can vary solver strategy independently from task data, model adapter, and scaffold policy.
 
-**Architecture:** Add `internal/solver` with a small `Solver` interface. `single_shot_code` is the default solver. Later solvers compose planner, tool use, external CLI agents, or multi-agent roles behind the same interface.
+**Architecture:** Add `internal/solver` with a small `Solver` interface. `single_shot_code` is the default solver. Planner, tool-using, external CLI, and multi-agent variants all sit behind the same interface and emit the same trace/result shape.
 
 **Tech Stack:** Go, context cancellation, dependency injection, table-driven tests.
 
@@ -150,7 +150,134 @@ git add internal/manifest internal/solver
 git commit -m "Parse solver configuration"
 ```
 
-### Task 4: Add External CLI Agent Stub With Safety Validation
+### Task 4: Add Planner-Then-Act Solver
+
+**Files:**
+- Create: `internal/solver/planner_then_act.go`
+- Create: `internal/solver/planner_then_act_test.go`
+
+**Interfaces:**
+- Consumes: `solver.Solver`, `solver.Config`, planner model role
+- Produces: `PlannerThenAct`
+
+- [ ] **Step 1: Write the failing test**
+
+```go
+func TestPlannerThenActRequiresPlannerRole(t *testing.T) {
+	_, err := solver.NewPlannerThenAct(solver.Config{ID: "plan-act", Kind: "planner_then_act"})
+	if err == nil {
+		t.Fatal("NewPlannerThenAct() error = nil, want missing planner role error")
+	}
+}
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/solver`
+Expected: FAIL because `NewPlannerThenAct` is undefined.
+
+- [ ] **Step 3: Implement planner-then-act solver**
+
+Run a planning model request, record the plan as a trace event and intermediate artifact, then pass the plan into a configured child solver for execution.
+
+- [ ] **Step 4: Run tests**
+
+Run: `GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/solver`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add internal/solver
+git commit -m "Add planner-then-act solver"
+```
+
+### Task 5: Add Tool-Using Agent Solver
+
+**Files:**
+- Create: `internal/solver/tool_agent.go`
+- Create: `internal/solver/tool_agent_test.go`
+
+**Interfaces:**
+- Consumes: scaffold tool policy, tool registry, runtime approval policy
+- Produces: `ToolUsingAgent`
+
+- [ ] **Step 1: Write the failing test**
+
+```go
+func TestToolUsingAgentRejectsToolOutsidePolicy(t *testing.T) {
+	agent := solver.ToolUsingAgent{AllowedTools: []string{"search"}}
+	_, err := agent.Solve(context.Background(), solver.Request{RequestedTools: []string{"shell"}})
+	if err == nil {
+		t.Fatal("Solve() error = nil, want tool policy error")
+	}
+}
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/solver`
+Expected: FAIL because `ToolUsingAgent` is undefined.
+
+- [ ] **Step 3: Implement tool-using solver**
+
+Validate requested tools against scaffold policy, enforce per-tool call limits, emit tool-call trace events, and return unsupported execution for tool implementations that are not registered.
+
+- [ ] **Step 4: Run tests**
+
+Run: `GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/solver ./internal/tools`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add internal/solver internal/tools
+git commit -m "Add tool-using solver contract"
+```
+
+### Task 6: Add Multi-Agent Solver Composition
+
+**Files:**
+- Create: `internal/solver/multi_agent.go`
+- Create: `internal/solver/multi_agent_test.go`
+
+**Interfaces:**
+- Consumes: solver registry, model roles, role-specific child solvers
+- Produces: `MultiAgent`
+
+- [ ] **Step 1: Write the failing test**
+
+```go
+func TestMultiAgentRequiresAtLeastTwoRoles(t *testing.T) {
+	_, err := solver.NewMultiAgent(solver.Config{ID: "solo", Kind: "multi_agent", Roles: []solver.RoleConfig{{Name: "worker"}}})
+	if err == nil {
+		t.Fatal("NewMultiAgent() error = nil, want role count error")
+	}
+}
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/solver`
+Expected: FAIL because `NewMultiAgent` is undefined.
+
+- [ ] **Step 3: Implement multi-agent composition**
+
+Validate role names, role model bindings, child solver references, aggregation policy, and trace namespacing. Execute child solvers sequentially first; parallel execution belongs to runtime concurrency once shared state semantics are explicit.
+
+- [ ] **Step 4: Run tests**
+
+Run: `GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/solver`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add internal/solver
+git commit -m "Add multi-agent solver composition"
+```
+
+### Task 7: Add External CLI Agent Stub With Safety Validation
 
 **Files:**
 - Create: `internal/solver/external_cli.go`
