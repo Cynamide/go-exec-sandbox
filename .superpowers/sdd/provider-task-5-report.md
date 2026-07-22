@@ -92,3 +92,85 @@ ok      gexec-sandbox/cmd/evaluator   0.320s
 ## Any concerns
 
 - The adapter itself is fully implemented and tested, but the current evaluator and `internal/llm` path are still hard-wired to Ollama outside this task’s scoped files. That means `openai_compatible` is now loadable in manifests and constructible via `modeladapter`, but benchmark execution is not yet generalized to select among loaded model adapters at runtime.
+
+---
+
+## Task 5 Review Fix Pass (July 22, 2026)
+
+### Scope fixed
+
+- Allowed `manifest.Load` to succeed when only enabled `openai_compatible` models are present, while leaving legacy Ollama runtime fields empty unless an enabled Ollama model exists.
+- Moved `api_key_env` presence validation into `NewOpenAICompatibleAdapter`, so startup fails early when the configured environment variable is missing.
+- Added strict validation for `temperature` and `max_tokens` constructor params, with `max_tokens` accepting only integer values.
+- Replaced brittle URL path concatenation with safe path joining for base URLs ending in `/v1/`.
+- Updated request-shape tests to go through `NewOpenAICompatibleAdapter` so constructor validation is exercised.
+
+### RED
+
+Command:
+
+```bash
+GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/modeladapter ./internal/manifest
+```
+
+Output:
+
+```text
+--- FAIL: TestOpenAICompatibleAdapterRejectsMissingAPIKey (0.00s)
+    openai_compatible_test.go:108: NewOpenAICompatibleAdapter() error = nil, want missing API key error
+--- FAIL: TestOpenAICompatibleAdapterJoinsPathsWithoutDoubleSlashes (0.00s)
+    openai_compatible_test.go:279: path = /v1//chat/completions, want /v1/chat/completions
+--- FAIL: TestOpenAICompatibleAdapterRejectsInvalidTemperatureParamType (0.00s)
+    openai_compatible_test.go:306: NewOpenAICompatibleAdapter() error = nil, want invalid temperature error
+--- FAIL: TestOpenAICompatibleAdapterRejectsInvalidMaxTokensParamType (0.00s)
+    openai_compatible_test.go:321: NewOpenAICompatibleAdapter() error = nil, want invalid max_tokens error
+FAIL
+FAIL    gexec-sandbox/internal/modeladapter  0.511s
+--- FAIL: TestLoadAllowsOpenAICompatibleManifestWithoutOllamaModel (0.00s)
+    manifest_test.go:421: Load() error = invalid benchmark manifest: at least one enabled ollama model is required
+FAIL
+FAIL    gexec-sandbox/internal/manifest      0.255s
+FAIL
+```
+
+Why it failed as expected:
+
+- The openai-compatible adapter still deferred API key validation until request time, still produced a double slash for `/v1/` base URLs, and still accepted invalid `temperature` / non-integral `max_tokens`.
+- Manifest loading still rejected manifests that had no enabled Ollama model, even when an enabled `openai_compatible` model was present.
+
+### GREEN
+
+Focused command:
+
+```bash
+GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./internal/modeladapter ./internal/manifest
+```
+
+Output:
+
+```text
+ok      gexec-sandbox/internal/modeladapter   0.643s
+ok      gexec-sandbox/internal/manifest       0.391s
+```
+
+Full-suite command:
+
+```bash
+GOCACHE=$PWD/.cache/go-build /usr/local/go/bin/go test ./...
+```
+
+Output:
+
+```text
+ok      gexec-sandbox/cmd/evaluator   0.336s
+ok      gexec-sandbox/internal/api    (cached)
+ok      gexec-sandbox/internal/benchmark      (cached)
+ok      gexec-sandbox/internal/config (cached)
+ok      gexec-sandbox/internal/httpapi        (cached)
+ok      gexec-sandbox/internal/llm    0.588s
+ok      gexec-sandbox/internal/manifest       (cached)
+ok      gexec-sandbox/internal/metrics        (cached)
+ok      gexec-sandbox/internal/middleware     (cached)
+ok      gexec-sandbox/internal/modeladapter   (cached)
+ok      gexec-sandbox/internal/sandbox        (cached)
+```

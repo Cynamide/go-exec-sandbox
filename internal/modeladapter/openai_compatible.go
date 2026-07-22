@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 )
 
 type openAICompatibleAdapter struct {
@@ -53,6 +55,12 @@ type openAICompatibleChatResponse struct {
 
 func NewOpenAICompatibleAdapter(cfg Config) (Adapter, error) {
 	if err := validateOpenAICompatibleConfig(cfg); err != nil {
+		return nil, err
+	}
+	if _, err := requiredAPIKey(cfg.APIKeyEnv); err != nil {
+		return nil, err
+	}
+	if err := validateOpenAICompatibleParams(cfg.ID, cfg.Params); err != nil {
 		return nil, err
 	}
 
@@ -161,10 +169,14 @@ func (a *openAICompatibleAdapter) chatRequestBody(req ModelRequest) ([]byte, err
 	if temperature, ok := floatParam(params["temperature"]); ok {
 		payload.Temperature = &temperature
 		delete(params, "temperature")
+	} else if _, present := params["temperature"]; present {
+		return nil, fmt.Errorf("model adapter config %q has invalid temperature param of type %T", a.modelName, params["temperature"])
 	}
 	if maxTokens, ok := intParam(params["max_tokens"]); ok {
 		payload.MaxTokens = &maxTokens
 		delete(params, "max_tokens")
+	} else if _, present := params["max_tokens"]; present {
+		return nil, fmt.Errorf("model adapter config %q has invalid max_tokens param of type %T", a.modelName, params["max_tokens"])
 	}
 
 	raw, err := json.Marshal(payload)
@@ -177,7 +189,7 @@ func (a *openAICompatibleAdapter) chatRequestBody(req ModelRequest) ([]byte, err
 
 func (a *openAICompatibleAdapter) newJSONRequest(ctx context.Context, method string, path string, body []byte) (*http.Request, error) {
 	endpoint := *a.baseURL
-	endpoint.Path += path
+	endpoint.Path = joinURLPath(endpoint.Path, path)
 
 	var bodyReader io.Reader
 	if body != nil {
@@ -228,6 +240,23 @@ func requiredAPIKey(envName string) (string, error) {
 	return value, nil
 }
 
+func validateOpenAICompatibleParams(configID string, params map[string]any) error {
+	if len(params) == 0 {
+		return nil
+	}
+	if value, ok := params["temperature"]; ok {
+		if _, valid := floatParam(value); !valid {
+			return fmt.Errorf("model adapter config %q has invalid temperature param of type %T", configID, value)
+		}
+	}
+	if value, ok := params["max_tokens"]; ok {
+		if _, valid := intParam(value); !valid {
+			return fmt.Errorf("model adapter config %q has invalid max_tokens param of type %T", configID, value)
+		}
+	}
+	return nil
+}
+
 func floatParam(value any) (float64, bool) {
 	switch typed := value.(type) {
 	case float64:
@@ -250,10 +279,20 @@ func intParam(value any) (int, bool) {
 	case int64:
 		return int(typed), true
 	case float64:
+		if math.Trunc(typed) != typed {
+			return 0, false
+		}
 		return int(typed), true
 	default:
 		return 0, false
 	}
+}
+
+func joinURLPath(basePath string, requestPath string) string {
+	if basePath == "" {
+		return requestPath
+	}
+	return path.Join(basePath, requestPath)
 }
 
 func cloneAnyMap(source map[string]any) map[string]any {

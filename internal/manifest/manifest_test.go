@@ -381,6 +381,63 @@ scaffolds:
 	}
 }
 
+func TestLoadAllowsOpenAICompatibleManifestWithoutOllamaModel(t *testing.T) {
+	t.Setenv("LOCAL_OPENAI_BASE_URL", "http://localhost:8081/v1")
+
+	loaded, err := Load(writeManifest(t, `
+schema_version: 1
+providers:
+  local_openai:
+    kind: openai_compatible
+    base_url: https://example.invalid/v1
+    base_url_env: LOCAL_OPENAI_BASE_URL
+    api_key_env: LOCAL_OPENAI_API_KEY
+models:
+  local_reasoner:
+    provider: local_openai
+    model_name: local-model
+    enabled: true
+    params:
+      temperature: 0.1
+      max_tokens: 512
+    capabilities:
+      conversation: true
+tasks:
+  task:
+    id: task
+    title: Task
+    description: Desc
+    family: support_workflows
+    language: python
+    test_cases:
+      - input: ""
+        expected_output: ok
+scaffolds:
+  baseline:
+    baseline: true
+    description: Baseline
+`))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if len(loaded.Models) != 1 {
+		t.Fatalf("Models length = %d, want 1", len(loaded.Models))
+	}
+	if loaded.Models[0].ID != "local_reasoner" {
+		t.Fatalf("Models[0].ID = %q, want local_reasoner", loaded.Models[0].ID)
+	}
+	if loaded.Models[0].ProviderKind != "openai_compatible" {
+		t.Fatalf("Models[0].ProviderKind = %q, want openai_compatible", loaded.Models[0].ProviderKind)
+	}
+	if loaded.Runtime.OLLAMAModel != "" {
+		t.Fatalf("Runtime.OLLAMAModel = %q, want empty", loaded.Runtime.OLLAMAModel)
+	}
+	if loaded.Runtime.OLLAMAHost != "" {
+		t.Fatalf("Runtime.OLLAMAHost = %q, want empty", loaded.Runtime.OLLAMAHost)
+	}
+}
+
 func TestLoadRejectsEnabledNonOllamaModel(t *testing.T) {
 	path := writeManifest(t, `
 schema_version: 1

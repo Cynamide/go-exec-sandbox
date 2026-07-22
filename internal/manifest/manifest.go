@@ -249,7 +249,7 @@ func (m file) ollamaSelection() (string, string, error) {
 	}
 
 	if enabledModelID == "" {
-		return "", "", fmt.Errorf("%w: at least one enabled ollama model is required", ErrInvalidManifest)
+		return "", "", nil
 	}
 
 	ollamaHost := resolveBaseURL(enabledProvider)
