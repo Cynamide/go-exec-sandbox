@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"net/http"
 	"os"
 	"os/signal"
@@ -26,6 +27,8 @@ import (
 	"gexec-sandbox/internal/sandbox"
 	"golang.org/x/time/rate"
 )
+
+const modelHealthCheckTimeout = 15 * time.Second
 
 func executeHandler(cfg config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -126,16 +129,21 @@ func newBenchmarkService(loaded manifest.Loaded) (benchmark.BenchmarkService, er
 		if err != nil {
 			return benchmark.BenchmarkService{}, fmt.Errorf("create benchmark llm client for model %q: %w", modelConfig.ID, err)
 		}
-		models = append(models, benchmark.ModelClient{ID: modelConfig.ID, Client: client})
+		models = append(models, benchmark.ModelClient{
+			ID:          modelConfig.ID,
+			Client:      client,
+			HealthCheck: adapter.HealthCheck,
+		})
 	}
 
 	return benchmark.BenchmarkService{
-		Tasks:     loaded.Tasks,
-		Scaffolds: loaded.Scaffolds,
-		Models:    models,
-		Executor:  benchmark.NewCodeExecutionAdapter(),
-		Grader:    benchmark.DefaultGrader{},
-		Config:    loaded.Runtime,
+		Tasks:             loaded.Tasks,
+		Scaffolds:         loaded.Scaffolds,
+		Models:            models,
+		Executor:          benchmark.NewCodeExecutionAdapter(),
+		Grader:            benchmark.DefaultGrader{},
+		Config:            loaded.Runtime,
+		DefaultModelRoles: maps.Clone(loaded.DefaultModelRoles),
 	}, nil
 }
 
@@ -230,6 +238,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize benchmark service: %v", err)
 	}
+	healthCtx, cancelHealthCheck := context.WithTimeout(rootCtx, modelHealthCheckTimeout)
+	if err := benchmarkService.HealthCheckModels(healthCtx); err != nil {
+		cancelHealthCheck()
+		log.Fatalf("Failed benchmark model health check: %v", err)
+	}
+	cancelHealthCheck()
 	log.Printf("Initialized %d benchmark model adapter(s)", len(benchmarkService.Models))
 
 	if len(os.Args) > 1 && os.Args[1] == "benchmark" {

@@ -279,15 +279,21 @@ func validateOpenAICompatibleConfig(cfg Config) error {
 	return nil
 }
 
-func validateOpenAICompatibleBaseURL(configID string, baseURL *url.URL) error {
-	if baseURL.Scheme != "http" && baseURL.Scheme != "https" {
-		return fmt.Errorf("model adapter config %q base URL must use http or https", configID)
+func validateOpenAICompatibleURL(configID string, label string, providerURL *url.URL) error {
+	if providerURL.Scheme != "http" && providerURL.Scheme != "https" {
+		return fmt.Errorf("model adapter config %q %s must use http or https", configID, label)
 	}
-	if baseURL.Host == "" {
-		return fmt.Errorf("model adapter config %q base URL must be absolute", configID)
+	if providerURL.Hostname() == "" {
+		return fmt.Errorf("model adapter config %q %s must include a hostname", configID, label)
 	}
-	if baseURL.User != nil {
-		return fmt.Errorf("model adapter config %q base URL must not contain credentials", configID)
+	if providerURL.User != nil {
+		return fmt.Errorf("model adapter config %q %s must not contain userinfo", configID, label)
+	}
+	if providerURL.Fragment != "" {
+		return fmt.Errorf("model adapter config %q %s must not contain a fragment", configID, label)
+	}
+	if providerURL.RawQuery != "" || providerURL.ForceQuery {
+		return fmt.Errorf("model adapter config %q %s must not contain query parameters", configID, label)
 	}
 	return nil
 }
@@ -295,10 +301,10 @@ func validateOpenAICompatibleBaseURL(configID string, baseURL *url.URL) error {
 func parseOpenAICompatibleURL(configID string, label string, rawURL string) (*url.URL, error) {
 	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("model adapter config %q %s is invalid: %w", configID, label, err)
 	}
-	if err := validateOpenAICompatibleBaseURL(configID, parsedURL); err != nil {
-		return nil, fmt.Errorf("%s: %w", label, err)
+	if err := validateOpenAICompatibleURL(configID, label, parsedURL); err != nil {
+		return nil, err
 	}
 	return parsedURL, nil
 }

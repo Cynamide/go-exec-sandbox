@@ -3,6 +3,7 @@ package benchmark
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	"gexec-sandbox/internal/config"
 )
@@ -12,18 +13,42 @@ type BenchmarkServiceAPI interface {
 }
 
 type BenchmarkService struct {
-	Tasks     TaskCatalog
-	Scaffolds ScaffoldCatalog
-	Models    []ModelClient
-	Client    LLMClient
-	Executor  Executor
-	Grader    Grader
-	Config    config.Config
+	Tasks             TaskCatalog
+	Scaffolds         ScaffoldCatalog
+	Models            []ModelClient
+	Client            LLMClient
+	Executor          Executor
+	Grader            Grader
+	Config            config.Config
+	DefaultModelRoles map[string]string
 }
 
 type ModelClient struct {
-	ID     string
-	Client LLMClient
+	ID          string
+	Client      LLMClient
+	HealthCheck func(context.Context) error
+}
+
+func (s BenchmarkService) HealthCheckModels(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if len(s.Models) == 0 {
+		return fmt.Errorf("model health checks require configured models")
+	}
+
+	for _, model := range s.Models {
+		if model.HealthCheck == nil {
+			return fmt.Errorf("health check for model %q is required", model.ID)
+		}
+		if err := model.HealthCheck(ctx); err != nil {
+			return fmt.Errorf("health check model %q: %w", model.ID, err)
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s BenchmarkService) Run(ctx context.Context) (BenchmarkReport, error) {
@@ -104,5 +129,7 @@ func (s BenchmarkService) Run(ctx context.Context) (BenchmarkReport, error) {
 		}
 	}
 
-	return BuildBenchmarkReport(s.Tasks.Tasks, runs), nil
+	report := BuildBenchmarkReport(s.Tasks.Tasks, runs)
+	report.DefaultModelRoles = maps.Clone(s.DefaultModelRoles)
+	return report, nil
 }

@@ -226,6 +226,9 @@ func resolveAuth(modelID string, providerAPIKeyEnv string, auth *modeladapter.Au
 	if auth == nil {
 		return modeladapter.AuthConfig{}, providerAPIKeyEnv, nil
 	}
+	if err := auth.Validate(); err != nil {
+		return modeladapter.AuthConfig{}, "", fmt.Errorf("%w: model %q %v", ErrInvalidManifest, modelID, err)
+	}
 
 	switch auth.Type {
 	case "none":

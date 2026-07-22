@@ -863,6 +863,40 @@ func TestLoadRejectsUnsupportedLiveModelAuth(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsMalformedCanonicalAuth(t *testing.T) {
+	for name, auth := range map[string]string{
+		"none with env": `
+    auth:
+      type: none
+      env: UNUSED_API_KEY`,
+		"none with header": `
+    auth:
+      type: none
+      header: Authorization`,
+		"bearer with header": `
+    auth:
+      type: bearer_env
+      env: REMOTE_MODEL_API_KEY
+      header: X-API-Key`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := Load(writeManifest(t, manifestFixture(`
+  compatible:
+    kind: openai_compatible
+    base_url: https://models.example.test/v1
+`, fmt.Sprintf(`
+  remote:
+    provider: compatible
+    model_name: remote-model
+    enabled: true%s
+`, auth), "")))
+			if err == nil || !strings.Contains(err.Error(), "auth") {
+				t.Fatalf("Load() error = %v, want malformed auth error", err)
+			}
+		})
+	}
+}
+
 func TestLoadRejectsScaffoldToolCapabilityMismatch(t *testing.T) {
 	_, err := Load(writeManifest(t, manifestFixture(`
   ollama_local:

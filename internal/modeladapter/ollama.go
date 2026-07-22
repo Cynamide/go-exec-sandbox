@@ -114,11 +114,17 @@ func newOllamaClient(baseURL string) (*api.Client, error) {
 	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
 		return nil, fmt.Errorf("ollama base URL must use http or https")
 	}
-	if parsedURL.Host == "" {
-		return nil, fmt.Errorf("ollama base URL must be absolute")
+	if parsedURL.Hostname() == "" {
+		return nil, fmt.Errorf("ollama base URL must include a hostname")
 	}
 	if parsedURL.User != nil {
-		return nil, fmt.Errorf("ollama base URL must not contain credentials")
+		return nil, fmt.Errorf("ollama base URL must not contain userinfo")
+	}
+	if parsedURL.Fragment != "" {
+		return nil, fmt.Errorf("ollama base URL must not contain a fragment")
+	}
+	if parsedURL.RawQuery != "" || parsedURL.ForceQuery {
+		return nil, fmt.Errorf("ollama base URL must not contain query parameters")
 	}
 
 	return api.NewClient(parsedURL, http.DefaultClient), nil

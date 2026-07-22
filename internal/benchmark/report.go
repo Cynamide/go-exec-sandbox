@@ -21,6 +21,7 @@ type ModelSummary struct {
 	BaselineSuccessRate   float64 `json:"baseline_success_rate"`
 	ScaffoldedSuccessRate float64 `json:"scaffolded_success_rate"`
 	Lift                  float64 `json:"lift"`
+	ScaffoldedScaffold    string  `json:"scaffolded_scaffold,omitempty"`
 }
 
 type BenchmarkRunGroup struct {
@@ -45,6 +46,7 @@ type BenchmarkReport struct {
 	ByFamily              map[string]FamilySummary   `json:"by_family"`
 	ByScaffold            map[string]ScaffoldSummary `json:"by_scaffold"`
 	ByModel               map[string]ModelSummary    `json:"by_model,omitempty"`
+	DefaultModelRoles     map[string]string          `json:"default_model_roles,omitempty"`
 	Runs                  []Run                      `json:"runs"`
 	Baseline              BenchmarkRunGroup          `json:"baseline"`
 	Scaffolded            BenchmarkRunGroup          `json:"scaffolded"`
@@ -233,6 +235,7 @@ func buildModelSummaries(tasks []Task, runs []Run) map[string]ModelSummary {
 			BaselineSuccessRate:   modelReport.BaselineSuccessRate,
 			ScaffoldedSuccessRate: modelReport.ScaffoldedSuccessRate,
 			Lift:                  modelReport.Lift,
+			ScaffoldedScaffold:    modelReport.ScaffoldedScaffold,
 		}
 	}
 	return summaries

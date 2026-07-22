@@ -29,7 +29,10 @@ func TestNewOllamaAdapterRejectsUnsafeOrNonHTTPBaseURL(t *testing.T) {
 		"relative":           "/api",
 		"schemeless":         "ollama.test:11434",
 		"non-http":           "ftp://ollama.test",
+		"empty hostname":     "http://:8080",
 		"inline credentials": "http://user:secret@ollama.test",
+		"fragment":           "http://ollama.test#tags",
+		"query secret":       "http://ollama.test?api_token=secret",
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := NewOllamaAdapter(Config{ID: "qwen", ProviderKind: "ollama", ModelName: "qwen3:4b", BaseURL: baseURL})

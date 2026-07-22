@@ -3,6 +3,7 @@ package benchmark
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"gexec-sandbox/internal/api"
@@ -45,6 +46,9 @@ func TestBenchmarkServiceRunReturnsReport(t *testing.T) {
 		},
 		Grader: DefaultGrader{},
 		Config: config.Config{DefaultTimeoutMS: 1234},
+		DefaultModelRoles: map[string]string{
+			"judge": "judge-model",
+		},
 	}
 
 	report, err := svc.Run(context.Background())
@@ -86,6 +90,10 @@ func TestBenchmarkServiceRunReturnsReport(t *testing.T) {
 
 	if report.Lift != 1 {
 		t.Fatalf("Lift = %v, want 1", report.Lift)
+	}
+
+	if got := report.DefaultModelRoles["judge"]; got != "judge-model" {
+		t.Fatalf("DefaultModelRoles[judge] = %q, want judge-model", got)
 	}
 
 	if len(report.Scaffolds) != 2 {
@@ -169,6 +177,27 @@ func TestBenchmarkServiceRunExecutesEveryModelAndAttributesRuns(t *testing.T) {
 	}
 	if report.ByModel["alpha"].BaselineSuccessRate != 1 || report.ByModel["beta"].ScaffoldedSuccessRate != 1 {
 		t.Fatalf("ByModel = %#v, want passing summaries", report.ByModel)
+	}
+}
+
+func TestBenchmarkServiceHealthCheckModelsInvokesEveryConfiguredModel(t *testing.T) {
+	checked := make([]string, 0, 2)
+	svc := BenchmarkService{Models: []ModelClient{
+		{ID: "alpha", HealthCheck: func(context.Context) error {
+			checked = append(checked, "alpha")
+			return nil
+		}},
+		{ID: "beta", HealthCheck: func(context.Context) error {
+			checked = append(checked, "beta")
+			return nil
+		}},
+	}}
+
+	if err := svc.HealthCheckModels(context.Background()); err != nil {
+		t.Fatalf("HealthCheckModels() error = %v", err)
+	}
+	if got := strings.Join(checked, ","); got != "alpha,beta" {
+		t.Fatalf("checked models = %q, want alpha,beta", got)
 	}
 }
 

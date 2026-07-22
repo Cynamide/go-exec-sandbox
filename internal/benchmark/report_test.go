@@ -36,6 +36,30 @@ func TestBenchmarkReportCarriesFamilyAndScaffoldBreakdowns(t *testing.T) {
 	}
 }
 
+func TestBuildBenchmarkReportNamesEachModelsSelectedScaffold(t *testing.T) {
+	tasks := []Task{{ID: "task-1", TaskFamily: "software_engineering"}}
+	runs := []Run{
+		{TaskID: "task-1", ModelID: "alpha", Mode: RunModeBaseline, Scaffold: Scaffold{Name: "baseline", Baseline: true}},
+		{TaskID: "task-1", ModelID: "beta", Mode: RunModeBaseline, Scaffold: Scaffold{Name: "baseline", Baseline: true}},
+		{TaskID: "task-1", ModelID: "alpha", Mode: RunModeScaffolded, Scaffold: Scaffold{Name: "alpha-scaffold"}, Passed: true},
+		{TaskID: "task-1", ModelID: "beta", Mode: RunModeScaffolded, Scaffold: Scaffold{Name: "alpha-scaffold"}},
+		{TaskID: "task-1", ModelID: "alpha", Mode: RunModeScaffolded, Scaffold: Scaffold{Name: "beta-scaffold"}},
+		{TaskID: "task-1", ModelID: "beta", Mode: RunModeScaffolded, Scaffold: Scaffold{Name: "beta-scaffold"}, Passed: true},
+	}
+
+	report := BuildBenchmarkReport(tasks, runs)
+
+	if report.ScaffoldedScaffold != "alpha-scaffold" {
+		t.Fatalf("ScaffoldedScaffold = %q, want deterministic global alpha-scaffold", report.ScaffoldedScaffold)
+	}
+	if got := report.ByModel["alpha"].ScaffoldedScaffold; got != "alpha-scaffold" {
+		t.Fatalf("ByModel[alpha].ScaffoldedScaffold = %q, want alpha-scaffold", got)
+	}
+	if got := report.ByModel["beta"].ScaffoldedScaffold; got != "beta-scaffold" {
+		t.Fatalf("ByModel[beta].ScaffoldedScaffold = %q, want beta-scaffold", got)
+	}
+}
+
 func TestBenchmarkReportJSONIncludesLegacyAndSummaryFields(t *testing.T) {
 	report := BenchmarkReport{
 		TotalTasks:            1,
@@ -67,6 +91,7 @@ func TestBenchmarkReportJSONIncludesLegacyAndSummaryFields(t *testing.T) {
 			Group:    BenchmarkRunGroup{Runs: []Run{{TaskID: "task-1", Mode: RunModeScaffolded, Scaffold: Scaffold{Name: "tool-assisted"}, Passed: true}}, PassedTasks: 1, SuccessRate: 1},
 			Lift:     1.0,
 		}},
+		DefaultModelRoles: map[string]string{"judge": "judge-model"},
 	}
 
 	raw, err := json.Marshal(report)
@@ -85,6 +110,11 @@ func TestBenchmarkReportJSONIncludesLegacyAndSummaryFields(t *testing.T) {
 
 	if _, ok := decoded["baseline"].(map[string]any); !ok {
 		t.Fatalf("baseline JSON = %T, want object", decoded["baseline"])
+	}
+
+	roles, ok := decoded["default_model_roles"].(map[string]any)
+	if !ok || roles["judge"] != "judge-model" {
+		t.Fatalf("default_model_roles JSON = %#v, want judge model metadata", decoded["default_model_roles"])
 	}
 
 	if _, ok := decoded["scaffolded"].(map[string]any); !ok {

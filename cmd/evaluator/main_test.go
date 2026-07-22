@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -110,6 +111,7 @@ func TestNewBenchmarkServiceConstructsClientsFromLoadedModelsWithoutOllama(t *te
 			ModelName:    "remote-model",
 			BaseURL:      "https://models.example.test/v1",
 		}},
+		DefaultModelRoles: map[string]string{"planner": "remote"},
 	}
 
 	service, err := newBenchmarkService(loaded)
@@ -121,6 +123,9 @@ func TestNewBenchmarkServiceConstructsClientsFromLoadedModelsWithoutOllama(t *te
 	}
 	if service.Models[0].ID != "remote" {
 		t.Fatalf("service.Models[0].ID = %q, want remote", service.Models[0].ID)
+	}
+	if got := service.DefaultModelRoles["planner"]; got != "remote" {
+		t.Fatalf("service.DefaultModelRoles[planner] = %q, want remote", got)
 	}
 }
 
@@ -147,6 +152,27 @@ func TestNewBenchmarkServiceRejectsNoEnabledModels(t *testing.T) {
 	_, err := newBenchmarkService(manifest.Loaded{})
 	if err == nil || !strings.Contains(err.Error(), "enabled model") {
 		t.Fatalf("newBenchmarkService() error = %v, want enabled model error", err)
+	}
+}
+
+func TestNewBenchmarkServiceConstructsBeforeSeparateModelHealthCheck(t *testing.T) {
+	service, err := newBenchmarkService(manifest.Loaded{Models: []modeladapter.Config{{
+		ID:           "remote",
+		ProviderKind: "openai_compatible",
+		ModelName:    "remote-model",
+		BaseURL:      "http://model-health.test/v1",
+	}}})
+	if err != nil {
+		t.Fatalf("newBenchmarkService() error = %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if service.Models[0].HealthCheck == nil {
+		t.Fatal("constructed model is missing health check callback")
+	}
+	if err := service.Models[0].HealthCheck(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("model HealthCheck() error = %v, want context canceled", err)
 	}
 }
 

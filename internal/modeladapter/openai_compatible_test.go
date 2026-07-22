@@ -374,10 +374,13 @@ func TestOpenAICompatibleAdapterRejectsInvalidMaxTokensValues(t *testing.T) {
 
 func TestOpenAICompatibleAdapterRejectsInvalidBaseURL(t *testing.T) {
 	for name, baseURL := range map[string]string{
-		"relative":   "/v1",
-		"schemeless": "openai.test/v1",
-		"ftp":        "ftp://openai.test/v1",
-		"userinfo":   "https://user:secret@openai.test/v1",
+		"relative":       "/v1",
+		"schemeless":     "openai.test/v1",
+		"ftp":            "ftp://openai.test/v1",
+		"empty hostname": "http://:8080/v1",
+		"userinfo":       "https://user:secret@openai.test/v1",
+		"fragment":       "https://openai.test/v1#models",
+		"query secret":   "https://openai.test/v1?api_key=secret",
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := NewOpenAICompatibleAdapter(Config{
@@ -390,6 +393,59 @@ func TestOpenAICompatibleAdapterRejectsInvalidBaseURL(t *testing.T) {
 				t.Fatal("NewOpenAICompatibleAdapter() error = nil, want invalid base URL error")
 			}
 		})
+	}
+}
+
+func TestOpenAICompatibleAdapterRejectsInvalidEndpointURLWithEndpointWording(t *testing.T) {
+	for name, endpointURL := range map[string]string{
+		"empty hostname": "http://:8080/chat/completions",
+		"fragment":       "https://inference.test/chat/completions#generate",
+		"query secret":   "https://inference.test/chat/completions?access_token=secret",
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := NewOpenAICompatibleAdapter(Config{
+				ID:           "local",
+				ProviderKind: "openai_compatible",
+				BaseURL:      "https://models.test/v1",
+				EndpointURL:  endpointURL,
+				ModelName:    "local-model",
+			})
+			if err == nil {
+				t.Fatal("NewOpenAICompatibleAdapter() error = nil, want invalid endpoint URL error")
+			}
+			if !strings.Contains(err.Error(), "endpoint URL") || strings.Contains(err.Error(), "base URL") {
+				t.Fatalf("NewOpenAICompatibleAdapter() error = %q, want endpoint URL wording", err)
+			}
+		})
+	}
+}
+
+func TestOpenAICompatibleAdapterSendsGenerationToConfiguredEndpointURL(t *testing.T) {
+	adapter, err := NewOpenAICompatibleAdapter(Config{
+		ID:           "local",
+		ProviderKind: "openai_compatible",
+		BaseURL:      "https://models.test/v1",
+		EndpointURL:  "https://inference.test/custom/generate",
+		ModelName:    "local-model",
+	})
+	if err != nil {
+		t.Fatalf("NewOpenAICompatibleAdapter() error = %v", err)
+	}
+
+	typedAdapter := adapter.(*openAICompatibleAdapter)
+	typedAdapter.httpClient = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Host != "inference.test" || r.URL.Path != "/custom/generate" {
+			t.Fatalf("generation URL = %s, want https://inference.test/custom/generate", r.URL)
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"answer"}}]}`)),
+		}, nil
+	})}
+
+	if _, err := adapter.Generate(context.Background(), ModelRequest{}); err != nil {
+		t.Fatalf("Generate() error = %v", err)
 	}
 }
 
@@ -479,6 +535,59 @@ func TestNewAdapterValidatesBearerAuthEnvWithoutManifestResolution(t *testing.T)
 	})
 	if err == nil || !strings.Contains(err.Error(), apiKeyEnv) {
 		t.Fatalf("New() error = %v, want missing bearer auth env error", err)
+	}
+}
+
+func TestNewAdapterRejectsMalformedCanonicalAuth(t *testing.T) {
+	for name, auth := range map[string]AuthConfig{
+		"none with env":      {Type: "none", Env: "UNUSED_API_KEY"},
+		"none with header":   {Type: "none", Header: "Authorization"},
+		"bearer with header": {Type: "bearer_env", Env: "REMOTE_MODEL_API_KEY", Header: "X-API-Key"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := New(Config{
+				ID:           "local",
+				ProviderKind: "openai_compatible",
+				BaseURL:      "http://openai.test/v1",
+				ModelName:    "local-model",
+				Auth:         auth,
+			})
+			if err == nil || !strings.Contains(err.Error(), "auth") {
+				t.Fatalf("New() error = %v, want malformed auth error", err)
+			}
+		})
+	}
+}
+
+func TestNewAdapterAuthNoneSuppressesProviderAPIKey(t *testing.T) {
+	t.Setenv("PROVIDER_API_KEY", "secret-key")
+
+	adapter, err := New(Config{
+		ID:           "local",
+		ProviderKind: "openai_compatible",
+		BaseURL:      "http://openai.test/v1",
+		ModelName:    "local-model",
+		APIKeyEnv:    "PROVIDER_API_KEY",
+		Auth:         AuthConfig{Type: "none"},
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	typedAdapter := adapter.(*openAICompatibleAdapter)
+	typedAdapter.httpClient = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if got := r.Header.Get("Authorization"); got != "" {
+			t.Fatalf("Authorization = %q, want empty for auth none", got)
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"choices":[{"message":{"content":"answer"}}]}`)),
+		}, nil
+	})}
+
+	if _, err := adapter.Generate(context.Background(), ModelRequest{}); err != nil {
+		t.Fatalf("Generate() error = %v", err)
 	}
 }
 

@@ -58,6 +58,30 @@ type AuthConfig struct {
 	Header string `yaml:"header"`
 }
 
+func (a AuthConfig) Validate() error {
+	switch a.Type {
+	case "":
+		if a.Env != "" || a.Header != "" {
+			return fmt.Errorf("auth type is required when env or header is set")
+		}
+	case "none":
+		if a.Env != "" {
+			return fmt.Errorf("auth type none must not include env")
+		}
+		if a.Header != "" {
+			return fmt.Errorf("auth type none must not include header")
+		}
+	case "bearer_env":
+		if a.Env == "" {
+			return fmt.Errorf("auth type bearer_env requires env")
+		}
+		if a.Header != "" {
+			return fmt.Errorf("auth type bearer_env does not support header")
+		}
+	}
+	return nil
+}
+
 type TransportConfig struct {
 	Protocol        string `yaml:"protocol"`
 	RequestFormat   string `yaml:"request_format"`
@@ -107,6 +131,9 @@ func (c Config) Validate() error {
 	}
 	if c.ModelName == "" {
 		return fmt.Errorf("model adapter config %q missing model name", c.ID)
+	}
+	if err := c.Auth.Validate(); err != nil {
+		return fmt.Errorf("model adapter config %q: %w", c.ID, err)
 	}
 	if err := ValidateMappings(c); err != nil {
 		return err
