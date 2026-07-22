@@ -297,6 +297,90 @@ scaffolds:
 	}
 }
 
+func TestLoadAllowsEnabledOpenAICompatibleModel(t *testing.T) {
+	t.Setenv("LOCAL_OPENAI_BASE_URL", "http://localhost:8081/v1")
+
+	loaded, err := Load(writeManifest(t, `
+schema_version: 1
+providers:
+  ollama_local:
+    kind: ollama
+    base_url: http://localhost:11434
+  local_openai:
+    kind: openai_compatible
+    base_url: https://example.invalid/v1
+    base_url_env: LOCAL_OPENAI_BASE_URL
+    api_key_env: LOCAL_OPENAI_API_KEY
+models:
+  qwen_local:
+    provider: ollama_local
+    model_name: qwen3:4b
+    enabled: true
+  local_reasoner:
+    provider: local_openai
+    model_name: local-model
+    enabled: true
+    params:
+      temperature: 0.1
+      max_tokens: 512
+    capabilities:
+      conversation: true
+      structured_output: true
+tasks:
+  task:
+    id: task
+    title: Task
+    description: Desc
+    family: support_workflows
+    language: python
+    test_cases:
+      - input: ""
+        expected_output: ok
+scaffolds:
+  baseline:
+    baseline: true
+    description: Baseline
+`))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if len(loaded.Models) != 2 {
+		t.Fatalf("Models length = %d, want 2", len(loaded.Models))
+	}
+
+	var gotOpenAIModel bool
+	for _, model := range loaded.Models {
+		if model.ID != "local_reasoner" {
+			continue
+		}
+		gotOpenAIModel = true
+		if model.ProviderKind != "openai_compatible" {
+			t.Fatalf("ProviderKind = %q, want openai_compatible", model.ProviderKind)
+		}
+		if model.BaseURL != "http://localhost:8081/v1" {
+			t.Fatalf("BaseURL = %q, want env override", model.BaseURL)
+		}
+		if model.APIKeyEnv != "LOCAL_OPENAI_API_KEY" {
+			t.Fatalf("APIKeyEnv = %q, want LOCAL_OPENAI_API_KEY", model.APIKeyEnv)
+		}
+		if got := model.Params["temperature"]; got != 0.1 {
+			t.Fatalf("Params[temperature] = %#v, want 0.1", got)
+		}
+		if got := model.Params["max_tokens"]; got != 512 {
+			t.Fatalf("Params[max_tokens] = %#v, want 512", got)
+		}
+	}
+
+	if !gotOpenAIModel {
+		t.Fatal("loaded models missing openai_compatible config")
+	}
+
+	if loaded.Runtime.OLLAMAModel != "qwen3:4b" {
+		t.Fatalf("Runtime.OLLAMAModel = %q, want primary enabled ollama model name", loaded.Runtime.OLLAMAModel)
+	}
+}
+
 func TestLoadRejectsEnabledNonOllamaModel(t *testing.T) {
 	path := writeManifest(t, `
 schema_version: 1
@@ -326,6 +410,40 @@ scaffolds:
 
 	if _, err := Load(path); err == nil {
 		t.Fatal("Load() error = nil, want unsupported provider error")
+	}
+}
+
+func TestLoadRejectsUnsupportedProviderKind(t *testing.T) {
+	path := writeManifest(t, `
+schema_version: 1
+providers:
+  unsupported:
+    kind: openai
+models:
+  gpt:
+    provider: unsupported
+    model_name: gpt-5.4-mini
+    enabled: true
+tasks:
+  task:
+    id: task
+    title: Task
+    description: Desc
+    family: support_workflows
+    language: python
+    test_cases:
+      - input: ""
+        expected_output: ok
+scaffolds:
+  baseline:
+    baseline: true
+    description: Baseline
+`)
+
+	if _, err := Load(path); err == nil {
+		t.Fatal("Load() error = nil, want unsupported provider error")
+	} else if !strings.Contains(err.Error(), `provider kind "openai" is not supported by the current runtime`) {
+		t.Fatalf("Load() error = %v, want unsupported openai runtime error", err)
 	}
 }
 

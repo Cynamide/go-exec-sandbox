@@ -186,7 +186,7 @@ func (m file) modelConfigs() ([]modeladapter.Config, error) {
 		if err := cfg.Validate(); err != nil {
 			return nil, err
 		}
-		if providerConfig.Kind != "ollama" {
+		if providerConfig.Kind != "ollama" && providerConfig.Kind != "openai_compatible" {
 			return nil, fmt.Errorf("%w: provider kind %q is not supported by the current runtime", ErrInvalidManifest, providerConfig.Kind)
 		}
 		models = append(models, cfg)
@@ -235,8 +235,11 @@ func (m file) ollamaSelection() (string, string, error) {
 		if !ok {
 			return "", "", fmt.Errorf("%w: model %q references unknown provider %q", ErrInvalidManifest, name, candidate.Provider)
 		}
-		if providerConfig.Kind != "ollama" {
+		if providerConfig.Kind != "ollama" && providerConfig.Kind != "openai_compatible" {
 			return "", "", fmt.Errorf("%w: provider kind %q is not supported by the current runtime", ErrInvalidManifest, providerConfig.Kind)
+		}
+		if providerConfig.Kind != "ollama" {
+			continue
 		}
 		if enabledModelID == "" {
 			enabledModelID = name
