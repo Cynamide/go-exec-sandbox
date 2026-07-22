@@ -22,6 +22,7 @@ import (
 	"gexec-sandbox/internal/manifest"
 	"gexec-sandbox/internal/metrics"
 	"gexec-sandbox/internal/middleware"
+	"gexec-sandbox/internal/modeladapter"
 	"gexec-sandbox/internal/sandbox"
 	"golang.org/x/time/rate"
 )
@@ -111,15 +112,27 @@ func buildMux(cfg config.Config, benchmarkService benchmark.BenchmarkServiceAPI)
 }
 
 func newBenchmarkService(loaded manifest.Loaded) (benchmark.BenchmarkService, error) {
-	client, err := llm.NewClientWithConfig(loaded.Runtime)
-	if err != nil {
-		return benchmark.BenchmarkService{}, fmt.Errorf("create benchmark llm client: %w", err)
+	if len(loaded.Models) == 0 {
+		return benchmark.BenchmarkService{}, fmt.Errorf("create benchmark service: at least one enabled model is required")
+	}
+
+	models := make([]benchmark.ModelClient, 0, len(loaded.Models))
+	for _, modelConfig := range loaded.Models {
+		adapter, err := modeladapter.New(modelConfig)
+		if err != nil {
+			return benchmark.BenchmarkService{}, fmt.Errorf("create adapter for model %q: %w", modelConfig.ID, err)
+		}
+		client, err := llm.NewClientWithAdapter(adapter)
+		if err != nil {
+			return benchmark.BenchmarkService{}, fmt.Errorf("create benchmark llm client for model %q: %w", modelConfig.ID, err)
+		}
+		models = append(models, benchmark.ModelClient{ID: modelConfig.ID, Client: client})
 	}
 
 	return benchmark.BenchmarkService{
 		Tasks:     loaded.Tasks,
 		Scaffolds: loaded.Scaffolds,
-		Client:    client,
+		Models:    models,
 		Executor:  benchmark.NewCodeExecutionAdapter(),
 		Grader:    benchmark.DefaultGrader{},
 		Config:    loaded.Runtime,
@@ -213,17 +226,11 @@ func main() {
 	rootCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	log.Println("Checking Ollama availability...")
-	if err := llm.WaitForOllamaWithConfig(rootCtx, cfg); err != nil {
-		log.Fatalf("Failed to connect to Ollama: %v", err)
-	}
-
-	log.Printf("Model %s should be available from Ollama service", cfg.OLLAMAModel)
-
 	benchmarkService, err := newBenchmarkService(loaded)
 	if err != nil {
 		log.Fatalf("Failed to initialize benchmark service: %v", err)
 	}
+	log.Printf("Initialized %d benchmark model adapter(s)", len(benchmarkService.Models))
 
 	if len(os.Args) > 1 && os.Args[1] == "benchmark" {
 		output, err := runBenchmarkCLIWithContext(rootCtx, os.Args[1:], benchmarkService)

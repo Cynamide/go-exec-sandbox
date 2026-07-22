@@ -117,6 +117,61 @@ func TestBenchmarkServiceRunReturnsReport(t *testing.T) {
 	}
 }
 
+func TestBenchmarkServiceRunExecutesEveryModelAndAttributesRuns(t *testing.T) {
+	svc := BenchmarkService{
+		Tasks: TaskCatalog{Tasks: []Task{{
+			ID:          "task-1",
+			Description: "demo",
+			TaskFamily:  "software_engineering",
+			Language:    "python",
+			TestCases:   []TestCase{{ExpectedOutput: "ok"}},
+		}}},
+		Scaffolds: ScaffoldCatalog{Scaffolds: []Scaffold{
+			{Baseline: true, Name: "baseline"},
+			{Name: "tool-assisted", PromptPrefix: "tool: "},
+		}},
+		Models: []ModelClient{
+			{ID: "alpha", Client: benchmarkServiceLLMClient{codeByPrompt: map[string]string{"demo": "print('alpha')", "tool: demo": "print('alpha')"}}},
+			{ID: "beta", Client: benchmarkServiceLLMClient{codeByPrompt: map[string]string{"demo": "print('beta')", "tool: demo": "print('beta')"}}},
+		},
+		Executor: benchmarkServiceExecutor{responseBySource: map[string]api.ExecutionResponse{
+			"print('alpha')": {Stdout: "ok"},
+			"print('beta')":  {Stdout: "ok"},
+		}},
+	}
+
+	report, err := svc.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if len(report.Runs) != 4 {
+		t.Fatalf("len(Runs) = %d, want 4", len(report.Runs))
+	}
+	seen := map[string]int{}
+	for _, run := range report.Runs {
+		if run.ModelID == "" {
+			t.Fatal("run missing ModelID")
+		}
+		seen[run.ModelID]++
+	}
+	if seen["alpha"] != 2 || seen["beta"] != 2 {
+		t.Fatalf("runs by model = %#v, want two each", seen)
+	}
+	if report.TotalModelTasks != 2 {
+		t.Fatalf("TotalModelTasks = %d, want 2", report.TotalModelTasks)
+	}
+	if len(report.ByModel) != 2 {
+		t.Fatalf("len(ByModel) = %d, want 2", len(report.ByModel))
+	}
+	if report.BaselineSuccessRate != 1 || report.ScaffoldedSuccessRate != 1 {
+		t.Fatalf("aggregate rates = baseline %v scaffolded %v, want 1 and 1", report.BaselineSuccessRate, report.ScaffoldedSuccessRate)
+	}
+	if report.ByModel["alpha"].BaselineSuccessRate != 1 || report.ByModel["beta"].ScaffoldedSuccessRate != 1 {
+		t.Fatalf("ByModel = %#v, want passing summaries", report.ByModel)
+	}
+}
+
 func TestBuildBenchmarkReportCountsScaffoldedTasksOnce(t *testing.T) {
 	report := BuildBenchmarkReport(
 		[]Task{{

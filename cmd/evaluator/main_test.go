@@ -12,6 +12,8 @@ import (
 
 	"gexec-sandbox/internal/benchmark"
 	"gexec-sandbox/internal/config"
+	"gexec-sandbox/internal/manifest"
+	"gexec-sandbox/internal/modeladapter"
 )
 
 func TestBuildMuxRegistersBenchmarkRunRoute(t *testing.T) {
@@ -89,6 +91,62 @@ func TestLoadBenchmarkManifestUsesReusableFixtureFiles(t *testing.T) {
 
 	if loaded.Runtime.OLLAMAModel == "" {
 		t.Fatal("manifest runtime missing OLLAMAModel")
+	}
+
+	service, err := newBenchmarkService(loaded)
+	if err != nil {
+		t.Fatalf("newBenchmarkService(repository manifest) error = %v", err)
+	}
+	if len(service.Models) != len(loaded.Models) {
+		t.Fatalf("service model count = %d, want %d", len(service.Models), len(loaded.Models))
+	}
+}
+
+func TestNewBenchmarkServiceConstructsClientsFromLoadedModelsWithoutOllama(t *testing.T) {
+	loaded := manifest.Loaded{
+		Models: []modeladapter.Config{{
+			ID:           "remote",
+			ProviderKind: "openai_compatible",
+			ModelName:    "remote-model",
+			BaseURL:      "https://models.example.test/v1",
+		}},
+	}
+
+	service, err := newBenchmarkService(loaded)
+	if err != nil {
+		t.Fatalf("newBenchmarkService() error = %v", err)
+	}
+	if len(service.Models) != 1 {
+		t.Fatalf("len(service.Models) = %d, want 1", len(service.Models))
+	}
+	if service.Models[0].ID != "remote" {
+		t.Fatalf("service.Models[0].ID = %q, want remote", service.Models[0].ID)
+	}
+}
+
+func TestNewBenchmarkServiceRejectsInvalidOpenAIModelWithoutConstructingOllama(t *testing.T) {
+	const apiKeyEnv = "EVALUATOR_TEST_MISSING_OPENAI_KEY"
+	t.Setenv(apiKeyEnv, "")
+
+	_, err := newBenchmarkService(manifest.Loaded{Models: []modeladapter.Config{{
+		ID:           "remote",
+		ProviderKind: "openai_compatible",
+		ModelName:    "remote-model",
+		BaseURL:      "https://models.example.test/v1",
+		APIKeyEnv:    apiKeyEnv,
+	}}})
+	if err == nil {
+		t.Fatal("newBenchmarkService() error = nil, want missing API key error")
+	}
+	if !strings.Contains(err.Error(), apiKeyEnv) {
+		t.Fatalf("newBenchmarkService() error = %v, want missing key env name", err)
+	}
+}
+
+func TestNewBenchmarkServiceRejectsNoEnabledModels(t *testing.T) {
+	_, err := newBenchmarkService(manifest.Loaded{})
+	if err == nil || !strings.Contains(err.Error(), "enabled model") {
+		t.Fatalf("newBenchmarkService() error = %v, want enabled model error", err)
 	}
 }
 

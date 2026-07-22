@@ -12,6 +12,7 @@ import (
 type ollamaAdapter struct {
 	client    *api.Client
 	modelName string
+	params    map[string]any
 }
 
 func NewOllamaAdapter(cfg Config) (Adapter, error) {
@@ -27,6 +28,7 @@ func NewOllamaAdapter(cfg Config) (Adapter, error) {
 	return &ollamaAdapter{
 		client:    client,
 		modelName: cfg.ModelName,
+		params:    cloneAnyMap(cfg.Params),
 	}, nil
 }
 
@@ -35,11 +37,19 @@ func (a *ollamaAdapter) Generate(ctx context.Context, req ModelRequest) (ModelRe
 		return ModelResponse{}, fmt.Errorf("ollama generate: model name is required")
 	}
 
+	params := cloneAnyMap(a.params)
+	if params == nil && len(req.Params) > 0 {
+		params = make(map[string]any, len(req.Params))
+	}
+	for key, value := range req.Params {
+		params[key] = value
+	}
+
 	chatReq := &api.ChatRequest{
 		Model:    a.modelName,
 		Messages: make([]api.Message, 0, len(req.Messages)),
 		Stream:   new(bool),
-		Options:  req.Params,
+		Options:  params,
 	}
 
 	for _, message := range req.Messages {
@@ -67,8 +77,19 @@ func (a *ollamaAdapter) Generate(ctx context.Context, req ModelRequest) (ModelRe
 }
 
 func (a *ollamaAdapter) HealthCheck(ctx context.Context) error {
-	_, err := a.client.List(ctx)
-	return err
+	response, err := a.client.List(ctx)
+	if err != nil {
+		return err
+	}
+	if a.modelName == "" {
+		return nil
+	}
+	for _, model := range response.Models {
+		if model.Name == a.modelName || model.Model == a.modelName {
+			return nil
+		}
+	}
+	return fmt.Errorf("ollama health check: configured model %q was not found", a.modelName)
 }
 
 func validateOllamaConfig(cfg Config) error {
@@ -89,6 +110,15 @@ func newOllamaClient(baseURL string) (*api.Client, error) {
 	parsedURL, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, err
+	}
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return nil, fmt.Errorf("ollama base URL must use http or https")
+	}
+	if parsedURL.Host == "" {
+		return nil, fmt.Errorf("ollama base URL must be absolute")
+	}
+	if parsedURL.User != nil {
+		return nil, fmt.Errorf("ollama base URL must not contain credentials")
 	}
 
 	return api.NewClient(parsedURL, http.DefaultClient), nil

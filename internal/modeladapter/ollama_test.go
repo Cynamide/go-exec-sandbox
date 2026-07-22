@@ -2,6 +2,7 @@ package modeladapter
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
@@ -20,6 +21,73 @@ func TestNewOllamaAdapterRejectsInvalidHost(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("NewOllamaAdapter() error = nil, want invalid URL error")
+	}
+}
+
+func TestNewOllamaAdapterRejectsUnsafeOrNonHTTPBaseURL(t *testing.T) {
+	for name, baseURL := range map[string]string{
+		"relative":           "/api",
+		"schemeless":         "ollama.test:11434",
+		"non-http":           "ftp://ollama.test",
+		"inline credentials": "http://user:secret@ollama.test",
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := NewOllamaAdapter(Config{ID: "qwen", ProviderKind: "ollama", ModelName: "qwen3:4b", BaseURL: baseURL})
+			if err == nil {
+				t.Fatal("NewOllamaAdapter() error = nil, want invalid base URL error")
+			}
+		})
+	}
+}
+
+func TestOllamaAdapterMergesConfigAndRequestParams(t *testing.T) {
+	baseURL, err := url.Parse("http://ollama.test")
+	if err != nil {
+		t.Fatalf("url.Parse() error = %v", err)
+	}
+
+	var options map[string]any
+	client := api.NewClient(baseURL, &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		var body struct {
+			Options map[string]any `json:"options"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("Decode() error = %v", err)
+		}
+		options = body.Options
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/x-ndjson"}},
+			Body:       io.NopCloser(strings.NewReader(`{"message":{"role":"assistant","content":"ok"},"done":true}` + "\n")),
+		}, nil
+	})})
+
+	adapter, err := NewOllamaAdapter(Config{
+		ID:           "qwen",
+		ProviderKind: "ollama",
+		ModelName:    "qwen3:4b",
+		BaseURL:      "http://ollama.test",
+		Params: map[string]any{
+			"temperature": 0.2,
+			"num_predict": 128,
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewOllamaAdapter() error = %v", err)
+	}
+	typedAdapter := adapter.(*ollamaAdapter)
+	typedAdapter.client = client
+	_, err = adapter.Generate(context.Background(), ModelRequest{Params: map[string]any{
+		"temperature": 0.7,
+	}})
+	if err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+	if options["temperature"] != 0.7 {
+		t.Fatalf("temperature = %#v, want request override 0.7", options["temperature"])
+	}
+	if options["num_predict"] != float64(128) {
+		t.Fatalf("num_predict = %#v, want config value 128", options["num_predict"])
 	}
 }
 

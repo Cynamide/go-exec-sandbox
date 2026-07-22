@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -748,6 +749,163 @@ scaffolds:
 	if _, err := Load(path); err == nil {
 		t.Fatal("Load() error = nil, want task key/id mismatch error")
 	}
+}
+
+func TestLoadRejectsManifestWithoutEnabledModels(t *testing.T) {
+	_, err := Load(writeManifest(t, manifestFixture(`
+  ollama_local:
+    kind: ollama
+`, `
+  qwen_local:
+    provider: ollama_local
+    model_name: qwen3:4b
+    enabled: false
+`, "")))
+	if err == nil || !strings.Contains(err.Error(), "at least one enabled model") {
+		t.Fatalf("Load() error = %v, want actionable enabled model error", err)
+	}
+}
+
+func TestLoadParsesModelLookupEndpointAndBearerAuth(t *testing.T) {
+	loaded, err := Load(writeManifest(t, manifestFixture(`
+  compatible:
+    kind: openai_compatible
+    base_url: https://models.example.test/v1
+    model_lookup: direct
+`, `
+  remote:
+    provider: compatible
+    model_name: remote-model
+    endpoint_url: https://inference.example.test/v1/chat/completions
+    enabled: true
+    auth:
+      type: bearer_env
+      env: REMOTE_MODEL_API_KEY
+`, "")))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	model := loaded.Models[0]
+	if model.ModelLookup != "direct" {
+		t.Fatalf("ModelLookup = %q, want direct", model.ModelLookup)
+	}
+	if model.EndpointURL != "https://inference.example.test/v1/chat/completions" {
+		t.Fatalf("EndpointURL = %q, want direct endpoint", model.EndpointURL)
+	}
+	if model.Auth.Type != "bearer_env" || model.Auth.Env != "REMOTE_MODEL_API_KEY" {
+		t.Fatalf("Auth = %+v, want bearer env auth", model.Auth)
+	}
+	if model.APIKeyEnv != "REMOTE_MODEL_API_KEY" {
+		t.Fatalf("APIKeyEnv = %q, want model auth override", model.APIKeyEnv)
+	}
+}
+
+func TestLoadRejectsEndpointAndProviderTransportConflict(t *testing.T) {
+	_, err := Load(writeManifest(t, manifestFixture(`
+  compatible:
+    kind: openai_compatible
+    base_url: https://models.example.test/v1
+    transport:
+      protocol: https
+      request_format: json
+      response_format: json
+      inference_path: /infer
+      healthcheck_path: /health
+`, `
+  remote:
+    provider: compatible
+    model_name: remote-model
+    endpoint_url: https://inference.example.test/v1/chat/completions
+    enabled: true
+`, "")))
+	if err == nil || !strings.Contains(err.Error(), "endpoint_url") || !strings.Contains(err.Error(), "transport") {
+		t.Fatalf("Load() error = %v, want endpoint/transport conflict", err)
+	}
+}
+
+func TestLoadRejectsUnsupportedLiveProviderTransport(t *testing.T) {
+	_, err := Load(writeManifest(t, manifestFixture(`
+  compatible:
+    kind: openai_compatible
+    base_url: https://models.example.test/v1
+    transport:
+      protocol: https
+      request_format: json
+`, `
+  remote:
+    provider: compatible
+    model_name: remote-model
+    enabled: true
+`, "")))
+	if err == nil || !strings.Contains(err.Error(), "transport is not supported") {
+		t.Fatalf("Load() error = %v, want unsupported live transport error", err)
+	}
+}
+
+func TestLoadRejectsUnsupportedLiveModelAuth(t *testing.T) {
+	_, err := Load(writeManifest(t, manifestFixture(`
+  compatible:
+    kind: openai_compatible
+    base_url: https://models.example.test/v1
+`, `
+  remote:
+    provider: compatible
+    model_name: remote-model
+    enabled: true
+    auth:
+      type: header_env
+      header: X-API-Key
+      env: REMOTE_MODEL_API_KEY
+`, "")))
+	if err == nil || !strings.Contains(err.Error(), "auth type") {
+		t.Fatalf("Load() error = %v, want unsupported live auth error", err)
+	}
+}
+
+func TestLoadRejectsScaffoldToolCapabilityMismatch(t *testing.T) {
+	_, err := Load(writeManifest(t, manifestFixture(`
+  ollama_local:
+    kind: ollama
+`, `
+  qwen_local:
+    provider: ollama_local
+    model_name: qwen3:4b
+    enabled: true
+    capabilities:
+      browser: false
+`, `
+  browser_assisted:
+    description: Use a browser.
+    tools:
+      - browser
+`)))
+	if err == nil || !strings.Contains(err.Error(), "capabilities.browser") {
+		t.Fatalf("Load() error = %v, want browser capability mismatch", err)
+	}
+}
+
+func manifestFixture(providers string, models string, extraScaffolds string) string {
+	return fmt.Sprintf(`
+schema_version: 1
+providers:%s
+models:%s
+tasks:
+  task:
+    id: task
+    title: Task
+    description: Desc
+    family: support_workflows
+    language: python
+    test_cases:
+      - input: ""
+        expected_output: ok
+scaffolds:
+  baseline:
+    baseline: true
+    description: Baseline
+%s
+`, providers, models, extraScaffolds)
 }
 
 func writeManifest(t *testing.T, contents string) string {

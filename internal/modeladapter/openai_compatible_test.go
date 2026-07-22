@@ -162,7 +162,7 @@ func TestOpenAICompatibleAdapterHealthCheckUsesModelsEndpoint(t *testing.T) {
 		return &http.Response{
 			StatusCode: http.StatusOK,
 			Header:     http.Header{"Content-Type": []string{"application/json"}},
-			Body:       io.NopCloser(strings.NewReader(`{"data":[]}`)),
+			Body:       io.NopCloser(strings.NewReader(`{"data":[{"id":"local-model"}]}`)),
 		}, nil
 	})}
 
@@ -377,6 +377,7 @@ func TestOpenAICompatibleAdapterRejectsInvalidBaseURL(t *testing.T) {
 		"relative":   "/v1",
 		"schemeless": "openai.test/v1",
 		"ftp":        "ftp://openai.test/v1",
+		"userinfo":   "https://user:secret@openai.test/v1",
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := NewOpenAICompatibleAdapter(Config{
@@ -389,6 +390,95 @@ func TestOpenAICompatibleAdapterRejectsInvalidBaseURL(t *testing.T) {
 				t.Fatal("NewOpenAICompatibleAdapter() error = nil, want invalid base URL error")
 			}
 		})
+	}
+}
+
+func TestOpenAICompatibleAdapterBoundsProviderErrorBody(t *testing.T) {
+	adapter, err := NewOpenAICompatibleAdapter(Config{
+		ID:           "local",
+		ProviderKind: "openai_compatible",
+		BaseURL:      "http://openai.test/v1",
+		ModelName:    "local-model",
+	})
+	if err != nil {
+		t.Fatalf("NewOpenAICompatibleAdapter() error = %v", err)
+	}
+
+	typedAdapter := adapter.(*openAICompatibleAdapter)
+	typedAdapter.httpClient = &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusBadRequest,
+			Body:       io.NopCloser(strings.NewReader(strings.Repeat("x", 100_000) + "secret-tail")),
+		}, nil
+	})}
+
+	_, err = adapter.Generate(context.Background(), ModelRequest{})
+	if err == nil {
+		t.Fatal("Generate() error = nil, want provider error")
+	}
+	if strings.Contains(err.Error(), "secret-tail") {
+		t.Fatalf("Generate() error contains unbounded response tail")
+	}
+	if len(err.Error()) > 70_000 {
+		t.Fatalf("Generate() error length = %d, want bounded error", len(err.Error()))
+	}
+}
+
+func TestOpenAICompatibleHealthCheckRejectsMissingConfiguredModel(t *testing.T) {
+	adapter, err := NewOpenAICompatibleAdapter(Config{
+		ID:           "local",
+		ProviderKind: "openai_compatible",
+		BaseURL:      "http://openai.test/v1",
+		ModelName:    "wanted-model",
+	})
+	if err != nil {
+		t.Fatalf("NewOpenAICompatibleAdapter() error = %v", err)
+	}
+
+	typedAdapter := adapter.(*openAICompatibleAdapter)
+	typedAdapter.httpClient = &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(`{"data":[{"id":"other-model"}]}`)),
+		}, nil
+	})}
+
+	if err := adapter.HealthCheck(context.Background()); err == nil || !strings.Contains(err.Error(), "wanted-model") {
+		t.Fatalf("HealthCheck() error = %v, want missing configured model error", err)
+	}
+}
+
+func TestNewAdapterDispatchesByProviderKind(t *testing.T) {
+	adapter, err := New(Config{
+		ID:           "local",
+		ProviderKind: "openai_compatible",
+		BaseURL:      "http://openai.test/v1",
+		ModelName:    "local-model",
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	if _, ok := adapter.(*openAICompatibleAdapter); !ok {
+		t.Fatalf("New() adapter = %T, want openAICompatibleAdapter", adapter)
+	}
+}
+
+func TestNewAdapterValidatesBearerAuthEnvWithoutManifestResolution(t *testing.T) {
+	const apiKeyEnv = "MODELADAPTER_TEST_MISSING_FACTORY_KEY"
+	t.Setenv(apiKeyEnv, "")
+
+	_, err := New(Config{
+		ID:           "local",
+		ProviderKind: "openai_compatible",
+		BaseURL:      "http://openai.test/v1",
+		ModelName:    "local-model",
+		Auth: AuthConfig{
+			Type: "bearer_env",
+			Env:  apiKeyEnv,
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), apiKeyEnv) {
+		t.Fatalf("New() error = %v, want missing bearer auth env error", err)
 	}
 }
 

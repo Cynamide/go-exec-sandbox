@@ -29,7 +29,8 @@ type ToolCall struct {
 }
 
 type ModelResponse struct {
-	Text      string
+	Text string
+	// ToolCalls contains parsed response data; adapters do not execute tool exchanges.
 	ToolCalls []ToolCall
 	Usage     Usage
 }
@@ -49,6 +50,24 @@ type ResponseMapping struct {
 	TextPath      string `yaml:"text_path"`
 	ToolCallsPath string `yaml:"tool_calls_path"`
 	UsagePath     string `yaml:"usage_path"`
+}
+
+type AuthConfig struct {
+	Type   string `yaml:"type"`
+	Env    string `yaml:"env"`
+	Header string `yaml:"header"`
+}
+
+type TransportConfig struct {
+	Protocol        string `yaml:"protocol"`
+	RequestFormat   string `yaml:"request_format"`
+	ResponseFormat  string `yaml:"response_format"`
+	InferencePath   string `yaml:"inference_path"`
+	HealthcheckPath string `yaml:"healthcheck_path"`
+}
+
+func (c TransportConfig) Configured() bool {
+	return c != (TransportConfig{})
 }
 
 type Capabilities struct {
@@ -71,7 +90,11 @@ type Config struct {
 	ProviderKind    string
 	ModelName       string
 	BaseURL         string
+	EndpointURL     string
 	APIKeyEnv       string
+	ModelLookup     string
+	Auth            AuthConfig
+	Transport       TransportConfig
 	Params          map[string]any
 	RequestMapping  RequestMapping
 	ResponseMapping ResponseMapping

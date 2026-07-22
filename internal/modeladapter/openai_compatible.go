@@ -15,13 +15,16 @@ import (
 )
 
 type openAICompatibleAdapter struct {
-	baseURL    *url.URL
-	httpClient *http.Client
-	modelName  string
-	configID   string
-	apiKeyEnv  string
-	params     map[string]any
+	baseURL     *url.URL
+	endpointURL *url.URL
+	httpClient  *http.Client
+	modelName   string
+	configID    string
+	apiKeyEnv   string
+	params      map[string]any
 }
+
+const maxProviderErrorBody = 64 << 10
 
 type openAICompatibleChatRequest struct {
 	Model       string                    `json:"model"`
@@ -66,21 +69,32 @@ func NewOpenAICompatibleAdapter(cfg Config) (Adapter, error) {
 		return nil, err
 	}
 
-	baseURL, err := url.Parse(cfg.BaseURL)
-	if err != nil {
-		return nil, err
+	var baseURL *url.URL
+	if cfg.BaseURL != "" {
+		parsed, err := parseOpenAICompatibleURL(cfg.ID, "base URL", cfg.BaseURL)
+		if err != nil {
+			return nil, err
+		}
+		baseURL = parsed
 	}
-	if err := validateOpenAICompatibleBaseURL(cfg.ID, baseURL); err != nil {
-		return nil, err
+
+	var endpointURL *url.URL
+	if cfg.EndpointURL != "" {
+		parsed, err := parseOpenAICompatibleURL(cfg.ID, "endpoint URL", cfg.EndpointURL)
+		if err != nil {
+			return nil, err
+		}
+		endpointURL = parsed
 	}
 
 	return &openAICompatibleAdapter{
-		baseURL:    baseURL,
-		httpClient: http.DefaultClient,
-		modelName:  cfg.ModelName,
-		configID:   cfg.ID,
-		apiKeyEnv:  cfg.APIKeyEnv,
-		params:     cloneAnyMap(cfg.Params),
+		baseURL:     baseURL,
+		endpointURL: endpointURL,
+		httpClient:  http.DefaultClient,
+		modelName:   cfg.ModelName,
+		configID:    cfg.ID,
+		apiKeyEnv:   cfg.APIKeyEnv,
+		params:      cloneAnyMap(cfg.Params),
 	}, nil
 }
 
@@ -102,8 +116,7 @@ func (a *openAICompatibleAdapter) Generate(ctx context.Context, req ModelRequest
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		raw, _ := io.ReadAll(resp.Body)
-		return ModelResponse{}, fmt.Errorf("openai-compatible generate: unexpected status %d: %s", resp.StatusCode, string(bytes.TrimSpace(raw)))
+		return ModelResponse{}, fmt.Errorf("openai-compatible generate: unexpected status %d: %s", resp.StatusCode, readProviderErrorBody(resp.Body))
 	}
 
 	var payload openAICompatibleChatResponse
@@ -141,6 +154,9 @@ func (a *openAICompatibleAdapter) Generate(ctx context.Context, req ModelRequest
 }
 
 func (a *openAICompatibleAdapter) HealthCheck(ctx context.Context) error {
+	if a.baseURL == nil {
+		return nil
+	}
 	httpReq, err := a.newJSONRequest(ctx, http.MethodGet, "/models", nil)
 	if err != nil {
 		return err
@@ -153,11 +169,25 @@ func (a *openAICompatibleAdapter) HealthCheck(ctx context.Context) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		raw, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("openai-compatible health check: unexpected status %d: %s", resp.StatusCode, string(bytes.TrimSpace(raw)))
+		return fmt.Errorf("openai-compatible health check: unexpected status %d: %s", resp.StatusCode, readProviderErrorBody(resp.Body))
 	}
 
-	return nil
+	// A 200 response is enough for unknown compatible servers. When the server
+	// exposes the standard model-list shape, also verify the configured model.
+	var payload struct {
+		Data *[]struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxProviderErrorBody)).Decode(&payload); err != nil || payload.Data == nil {
+		return nil
+	}
+	for _, model := range *payload.Data {
+		if model.ID == a.modelName {
+			return nil
+		}
+	}
+	return fmt.Errorf("openai-compatible health check: configured model %q was not found", a.modelName)
 }
 
 func (a *openAICompatibleAdapter) chatRequestBody(req ModelRequest) ([]byte, error) {
@@ -200,8 +230,16 @@ func (a *openAICompatibleAdapter) chatRequestBody(req ModelRequest) ([]byte, err
 }
 
 func (a *openAICompatibleAdapter) newJSONRequest(ctx context.Context, method string, path string, body []byte) (*http.Request, error) {
-	endpoint := *a.baseURL
-	endpoint.Path = joinURLPath(endpoint.Path, path)
+	var endpoint url.URL
+	if path == "/chat/completions" && a.endpointURL != nil {
+		endpoint = *a.endpointURL
+	} else {
+		if a.baseURL == nil {
+			return nil, fmt.Errorf("openai-compatible request: base URL is unavailable for %s", path)
+		}
+		endpoint = *a.baseURL
+		endpoint.Path = joinURLPath(endpoint.Path, path)
+	}
 
 	var bodyReader io.Reader
 	if body != nil {
@@ -232,8 +270,8 @@ func validateOpenAICompatibleConfig(cfg Config) error {
 	if cfg.ProviderKind != "" && cfg.ProviderKind != "openai_compatible" {
 		return fmt.Errorf("model adapter config %q has unsupported provider kind %q", cfg.ID, cfg.ProviderKind)
 	}
-	if cfg.BaseURL == "" {
-		return fmt.Errorf("model adapter config %q missing base URL", cfg.ID)
+	if cfg.BaseURL == "" && cfg.EndpointURL == "" {
+		return fmt.Errorf("model adapter config %q missing base URL or endpoint URL", cfg.ID)
 	}
 	if cfg.ModelName == "" {
 		return fmt.Errorf("model adapter config %q missing model name", cfg.ID)
@@ -248,7 +286,34 @@ func validateOpenAICompatibleBaseURL(configID string, baseURL *url.URL) error {
 	if baseURL.Host == "" {
 		return fmt.Errorf("model adapter config %q base URL must be absolute", configID)
 	}
+	if baseURL.User != nil {
+		return fmt.Errorf("model adapter config %q base URL must not contain credentials", configID)
+	}
 	return nil
+}
+
+func parseOpenAICompatibleURL(configID string, label string, rawURL string) (*url.URL, error) {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateOpenAICompatibleBaseURL(configID, parsedURL); err != nil {
+		return nil, fmt.Errorf("%s: %w", label, err)
+	}
+	return parsedURL, nil
+}
+
+func readProviderErrorBody(body io.Reader) string {
+	raw, _ := io.ReadAll(io.LimitReader(body, maxProviderErrorBody+1))
+	truncated := len(raw) > maxProviderErrorBody
+	if truncated {
+		raw = raw[:maxProviderErrorBody]
+	}
+	message := string(bytes.TrimSpace(raw))
+	if truncated {
+		message += " [truncated]"
+	}
+	return message
 }
 
 func requiredAPIKey(envName string) (string, error) {

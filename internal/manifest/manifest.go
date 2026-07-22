@@ -39,16 +39,20 @@ type runtimeDefaults struct {
 }
 
 type provider struct {
-	Kind       string `yaml:"kind"`
-	BaseURL    string `yaml:"base_url"`
-	BaseURLEnv string `yaml:"base_url_env"`
-	APIKeyEnv  string `yaml:"api_key_env"`
+	Kind        string                       `yaml:"kind"`
+	BaseURL     string                       `yaml:"base_url"`
+	BaseURLEnv  string                       `yaml:"base_url_env"`
+	APIKeyEnv   string                       `yaml:"api_key_env"`
+	ModelLookup string                       `yaml:"model_lookup"`
+	Transport   modeladapter.TransportConfig `yaml:"transport"`
 }
 
 type model struct {
 	Provider        string                       `yaml:"provider"`
 	ModelName       string                       `yaml:"model_name"`
+	EndpointURL     string                       `yaml:"endpoint_url"`
 	Enabled         bool                         `yaml:"enabled"`
+	Auth            *modeladapter.AuthConfig     `yaml:"auth"`
 	Params          map[string]any               `yaml:"params"`
 	RequestMapping  modeladapter.RequestMapping  `yaml:"request_mapping"`
 	ResponseMapping modeladapter.ResponseMapping `yaml:"response_mapping"`
@@ -115,6 +119,9 @@ func Load(path string) (Loaded, error) {
 	if err != nil {
 		return Loaded{}, err
 	}
+	if err := validateScaffoldCapabilities(models, scaffolds); err != nil {
+		return Loaded{}, err
+	}
 
 	return Loaded{
 		Runtime:           runtime,
@@ -171,13 +178,31 @@ func (m file) modelConfigs() ([]modeladapter.Config, error) {
 		if !ok {
 			return nil, fmt.Errorf("%w: model %q references unknown provider %q", ErrInvalidManifest, name, candidate.Provider)
 		}
+		if candidate.EndpointURL != "" && providerConfig.Transport.Configured() {
+			return nil, fmt.Errorf("%w: model %q endpoint_url conflicts with provider %q transport", ErrInvalidManifest, name, candidate.Provider)
+		}
+		if providerConfig.Transport.Configured() {
+			return nil, fmt.Errorf("%w: provider %q transport is not supported by the current runtime", ErrInvalidManifest, candidate.Provider)
+		}
+		if providerConfig.ModelLookup != "" && providerConfig.ModelLookup != "direct" {
+			return nil, fmt.Errorf("%w: provider %q model_lookup %q is not supported by the current runtime", ErrInvalidManifest, candidate.Provider, providerConfig.ModelLookup)
+		}
+
+		auth, apiKeyEnv, err := resolveAuth(name, providerConfig.APIKeyEnv, candidate.Auth)
+		if err != nil {
+			return nil, err
+		}
 		cfg := modeladapter.Config{
 			ID:              name,
 			ProviderID:      candidate.Provider,
 			ProviderKind:    providerConfig.Kind,
 			ModelName:       candidate.ModelName,
 			BaseURL:         resolveBaseURL(providerConfig),
-			APIKeyEnv:       providerConfig.APIKeyEnv,
+			EndpointURL:     candidate.EndpointURL,
+			APIKeyEnv:       apiKeyEnv,
+			ModelLookup:     providerConfig.ModelLookup,
+			Auth:            auth,
+			Transport:       providerConfig.Transport,
 			Params:          copyAnyMap(candidate.Params),
 			RequestMapping:  candidate.RequestMapping,
 			ResponseMapping: candidate.ResponseMapping,
@@ -191,7 +216,28 @@ func (m file) modelConfigs() ([]modeladapter.Config, error) {
 		}
 		models = append(models, cfg)
 	}
+	if len(models) == 0 {
+		return nil, fmt.Errorf("%w: at least one enabled model is required", ErrInvalidManifest)
+	}
 	return models, nil
+}
+
+func resolveAuth(modelID string, providerAPIKeyEnv string, auth *modeladapter.AuthConfig) (modeladapter.AuthConfig, string, error) {
+	if auth == nil {
+		return modeladapter.AuthConfig{}, providerAPIKeyEnv, nil
+	}
+
+	switch auth.Type {
+	case "none":
+		return *auth, "", nil
+	case "bearer_env":
+		if auth.Env == "" {
+			return modeladapter.AuthConfig{}, "", fmt.Errorf("%w: model %q auth type bearer_env requires env", ErrInvalidManifest, modelID)
+		}
+		return *auth, auth.Env, nil
+	default:
+		return modeladapter.AuthConfig{}, "", fmt.Errorf("%w: model %q auth type %q is not supported by the current runtime", ErrInvalidManifest, modelID, auth.Type)
+	}
 }
 
 func (m file) defaultModelRoles(models []modeladapter.Config) (map[string]string, error) {
@@ -311,6 +357,64 @@ func (m file) scaffoldCatalog() (benchmark.ScaffoldCatalog, error) {
 		return benchmark.ScaffoldCatalog{}, err
 	}
 	return catalog, nil
+}
+
+func validateScaffoldCapabilities(models []modeladapter.Config, scaffolds benchmark.ScaffoldCatalog) error {
+	for _, scaffold := range scaffolds.Scaffolds {
+		for _, tool := range scaffold.Tools {
+			capability, supported := scaffoldToolCapability(tool)
+			if !supported {
+				continue
+			}
+			for _, model := range models {
+				if !hasCapability(model.Capabilities, capability) {
+					return fmt.Errorf("%w: scaffold %q tool %q requires enabled model %q to declare capabilities.%s", ErrInvalidManifest, scaffold.Name, tool, model.ID, capability)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// Tasks do not yet declare browser or multimodal requirements. Until that
+// schema exists, only capability-bearing scaffold tool names are enforceable.
+// This validates declarations only; tool execution belongs to a future runtime.
+func scaffoldToolCapability(tool string) (string, bool) {
+	switch tool {
+	case "browser":
+		return "browser", true
+	case "file_editing":
+		return "file_editing", true
+	case "multimodal":
+		return "multimodal", true
+	case "terminal_session":
+		return "terminal_session", true
+	case "spreadsheet":
+		return "spreadsheet", true
+	case "notebook":
+		return "notebook", true
+	default:
+		return "", false
+	}
+}
+
+func hasCapability(capabilities modeladapter.Capabilities, capability string) bool {
+	switch capability {
+	case "browser":
+		return capabilities.Browser
+	case "file_editing":
+		return capabilities.FileEditing
+	case "multimodal":
+		return capabilities.Multimodal
+	case "terminal_session":
+		return capabilities.TerminalSession
+	case "spreadsheet":
+		return capabilities.Spreadsheet
+	case "notebook":
+		return capabilities.Notebook
+	default:
+		return false
+	}
 }
 
 func requireYAMLEOF(decoder *yaml.Decoder) error {

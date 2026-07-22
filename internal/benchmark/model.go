@@ -35,6 +35,7 @@ const (
 
 type Run struct {
 	TaskID   string    `json:"task_id"`
+	ModelID  string    `json:"model_id,omitempty"`
 	Mode     RunMode   `json:"mode"`
 	Scaffold Scaffold  `json:"scaffold"`
 	Passed   bool      `json:"passed"`

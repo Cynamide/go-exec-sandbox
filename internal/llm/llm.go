@@ -30,6 +30,13 @@ func NewClientWithConfig(cfg config.Config) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Ollama adapter: %w", err)
 	}
+	return NewClientWithAdapter(adapter)
+}
+
+func NewClientWithAdapter(adapter modeladapter.Adapter) (*Client, error) {
+	if adapter == nil {
+		return nil, fmt.Errorf("model adapter is required")
+	}
 	return &Client{adapter: adapter}, nil
 }
 

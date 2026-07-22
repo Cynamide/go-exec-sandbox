@@ -14,10 +14,16 @@ type BenchmarkServiceAPI interface {
 type BenchmarkService struct {
 	Tasks     TaskCatalog
 	Scaffolds ScaffoldCatalog
+	Models    []ModelClient
 	Client    LLMClient
 	Executor  Executor
 	Grader    Grader
 	Config    config.Config
+}
+
+type ModelClient struct {
+	ID     string
+	Client LLMClient
 }
 
 func (s BenchmarkService) Run(ctx context.Context) (BenchmarkReport, error) {
@@ -25,8 +31,17 @@ func (s BenchmarkService) Run(ctx context.Context) (BenchmarkReport, error) {
 		return BenchmarkReport{}, err
 	}
 
-	if s.Client == nil {
+	models := s.Models
+	if len(models) == 0 && s.Client != nil {
+		models = []ModelClient{{Client: s.Client}}
+	}
+	if len(models) == 0 {
 		return BenchmarkReport{}, fmt.Errorf("llm client is required")
+	}
+	for _, model := range models {
+		if model.Client == nil {
+			return BenchmarkReport{}, fmt.Errorf("llm client for model %q is required", model.ID)
+		}
 	}
 
 	if s.Executor == nil {
@@ -63,23 +78,28 @@ func (s BenchmarkService) Run(ctx context.Context) (BenchmarkReport, error) {
 		grader = DefaultGrader{}
 	}
 
-	runs := make([]Run, 0, len(s.Tasks.Tasks)*(1+len(scaffoldVariants)))
-	for _, task := range s.Tasks.Tasks {
-		if err := ctx.Err(); err != nil {
-			return BenchmarkReport{}, err
-		}
-
-		baselineRun := RunTaskWithGrader(ctx, task, *baselineScaffold, RunModeBaseline, s.Client, s.Executor, grader, s.Config)
-		runs = append(runs, baselineRun)
-
-		if err := ctx.Err(); err != nil {
-			return BenchmarkReport{}, err
-		}
-
-		for _, scaffold := range scaffoldVariants {
-			runs = append(runs, RunTaskWithGrader(ctx, task, scaffold, RunModeScaffolded, s.Client, s.Executor, grader, s.Config))
+	runs := make([]Run, 0, len(models)*len(s.Tasks.Tasks)*(1+len(scaffoldVariants)))
+	for _, model := range models {
+		for _, task := range s.Tasks.Tasks {
 			if err := ctx.Err(); err != nil {
 				return BenchmarkReport{}, err
+			}
+
+			baselineRun := RunTaskWithGrader(ctx, task, *baselineScaffold, RunModeBaseline, model.Client, s.Executor, grader, s.Config)
+			baselineRun.ModelID = model.ID
+			runs = append(runs, baselineRun)
+
+			if err := ctx.Err(); err != nil {
+				return BenchmarkReport{}, err
+			}
+
+			for _, scaffold := range scaffoldVariants {
+				run := RunTaskWithGrader(ctx, task, scaffold, RunModeScaffolded, model.Client, s.Executor, grader, s.Config)
+				run.ModelID = model.ID
+				runs = append(runs, run)
+				if err := ctx.Err(); err != nil {
+					return BenchmarkReport{}, err
+				}
 			}
 		}
 	}
