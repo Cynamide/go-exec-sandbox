@@ -39,17 +39,15 @@ type Adapter interface {
 }
 
 type RequestMapping struct {
-	MessagesField    string `yaml:"messages_field"`
-	TemperatureField string `yaml:"temperature_field"`
-	MaxTokensField   string `yaml:"max_tokens_field"`
-	ModelField       string `yaml:"model_field"`
+	Method       string `yaml:"method"`
+	Path         string `yaml:"path"`
+	BodyTemplate string `yaml:"body_template"`
 }
 
 type ResponseMapping struct {
-	TextPath                  string `yaml:"text_path"`
-	FinishReasonPath          string `yaml:"finish_reason_path"`
-	UsagePromptTokensPath     string `yaml:"usage_prompt_tokens_path"`
-	UsageCompletionTokensPath string `yaml:"usage_completion_tokens_path"`
+	TextPath      string `yaml:"text_path"`
+	ToolCallsPath string `yaml:"tool_calls_path"`
+	UsagePath     string `yaml:"usage_path"`
 }
 
 type Capabilities struct {
@@ -86,5 +84,33 @@ func (c Config) Validate() error {
 	if c.ModelName == "" {
 		return fmt.Errorf("model adapter config %q missing model name", c.ID)
 	}
+	if err := ValidateMappings(c); err != nil {
+		return err
+	}
+	return nil
+}
+
+func ValidateMappings(cfg Config) error {
+	if cfg.ProviderKind != "custom_http" {
+		return nil
+	}
+
+	var missing []string
+	if cfg.RequestMapping.Method == "" {
+		missing = append(missing, "request_mapping.method")
+	}
+	if cfg.RequestMapping.Path == "" {
+		missing = append(missing, "request_mapping.path")
+	}
+	if cfg.RequestMapping.BodyTemplate == "" {
+		missing = append(missing, "request_mapping.body_template")
+	}
+	if cfg.ResponseMapping.TextPath == "" {
+		missing = append(missing, "response_mapping.text_path")
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("model adapter config %q custom_http provider requires %s", cfg.ID, missing)
+	}
+
 	return nil
 }

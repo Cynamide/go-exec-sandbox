@@ -19,3 +19,16 @@ func TestConfigRequiresID(t *testing.T) {
 		t.Fatal("Validate() error = nil, want missing ID error")
 	}
 }
+
+func TestCustomHTTPProviderRequiresMappings(t *testing.T) {
+	cfg := modeladapter.Config{
+		ID:           "custom",
+		ProviderKind: "custom_http",
+		ModelName:    "custom-model",
+		BaseURL:      "http://localhost:8080",
+	}
+
+	if err := modeladapter.ValidateMappings(cfg); err == nil {
+		t.Fatal("ValidateMappings() error = nil, want missing mapping error")
+	}
+}

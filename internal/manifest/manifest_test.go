@@ -3,6 +3,7 @@ package manifest
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -137,15 +138,13 @@ models:
       temperature: 0
       max_tokens: 2048
     request_mapping:
-      messages_field: messages
-      temperature_field: temperature
-      max_tokens_field: max_tokens
-      model_field: model
+      method: POST
+      path: /api/generate
+      body_template: '{"model":"{{model}}","messages":{{messages}}}'
     response_mapping:
       text_path: choices[0].message.content
-      finish_reason_path: choices[0].finish_reason
-      usage_prompt_tokens_path: usage.prompt_tokens
-      usage_completion_tokens_path: usage.completion_tokens
+      tool_calls_path: choices[0].message.tool_calls
+      usage_path: usage
     capabilities:
       tool_use: false
       file_editing: false
@@ -213,17 +212,23 @@ scaffolds:
 	if got := model.Params["max_tokens"]; got != 2048 {
 		t.Fatalf("model.Params[max_tokens] = %#v, want 2048", got)
 	}
-	if model.RequestMapping.MessagesField != "messages" {
-		t.Fatalf("model.RequestMapping.MessagesField = %q, want messages", model.RequestMapping.MessagesField)
+	if model.RequestMapping.Method != "POST" {
+		t.Fatalf("model.RequestMapping.Method = %q, want POST", model.RequestMapping.Method)
 	}
-	if model.RequestMapping.ModelField != "model" {
-		t.Fatalf("model.RequestMapping.ModelField = %q, want model", model.RequestMapping.ModelField)
+	if model.RequestMapping.Path != "/api/generate" {
+		t.Fatalf("model.RequestMapping.Path = %q, want /api/generate", model.RequestMapping.Path)
+	}
+	if model.RequestMapping.BodyTemplate != "{\"model\":\"{{model}}\",\"messages\":{{messages}}}" {
+		t.Fatalf("model.RequestMapping.BodyTemplate = %q, want request body template", model.RequestMapping.BodyTemplate)
 	}
 	if model.ResponseMapping.TextPath != "choices[0].message.content" {
 		t.Fatalf("model.ResponseMapping.TextPath = %q, want choices[0].message.content", model.ResponseMapping.TextPath)
 	}
-	if model.ResponseMapping.UsageCompletionTokensPath != "usage.completion_tokens" {
-		t.Fatalf("model.ResponseMapping.UsageCompletionTokensPath = %q, want usage.completion_tokens", model.ResponseMapping.UsageCompletionTokensPath)
+	if model.ResponseMapping.ToolCallsPath != "choices[0].message.tool_calls" {
+		t.Fatalf("model.ResponseMapping.ToolCallsPath = %q, want choices[0].message.tool_calls", model.ResponseMapping.ToolCallsPath)
+	}
+	if model.ResponseMapping.UsagePath != "usage" {
+		t.Fatalf("model.ResponseMapping.UsagePath = %q, want usage", model.ResponseMapping.UsagePath)
 	}
 	if !model.Capabilities.Browser || !model.Capabilities.Multimodal || !model.Capabilities.VisualReasoning || !model.Capabilities.TerminalSession || !model.Capabilities.Conversation || !model.Capabilities.StructuredOutput || !model.Capabilities.Judge {
 		t.Fatalf("model.Capabilities = %+v, want declared capabilities", model.Capabilities)
@@ -319,6 +324,41 @@ scaffolds:
 
 	if _, err := Load(path); err == nil {
 		t.Fatal("Load() error = nil, want unsupported provider error")
+	}
+}
+
+func TestLoadRejectsCustomHTTPModelWithoutMappings(t *testing.T) {
+	path := writeManifest(t, `
+schema_version: 1
+providers:
+  custom_provider:
+    kind: custom_http
+    base_url: http://localhost:8080
+models:
+  custom_model:
+    provider: custom_provider
+    model_name: custom-model
+    enabled: true
+tasks:
+  task:
+    id: task
+    title: Task
+    description: Desc
+    family: support_workflows
+    language: python
+    test_cases:
+      - input: ""
+        expected_output: ok
+scaffolds:
+  baseline:
+    baseline: true
+    description: Baseline
+`)
+
+	if _, err := Load(path); err == nil {
+		t.Fatal("Load() error = nil, want missing mapping error")
+	} else if !strings.Contains(err.Error(), "mapping") {
+		t.Fatalf("Load() error = %v, want mapping-specific error", err)
 	}
 }
 

@@ -92,12 +92,12 @@ func Load(path string) (Loaded, error) {
 		return Loaded{}, err
 	}
 
-	runtime, err := manifest.runtimeConfig()
+	models, err := manifest.modelConfigs()
 	if err != nil {
 		return Loaded{}, err
 	}
 
-	models, err := manifest.modelConfigs()
+	runtime, err := manifest.runtimeConfig()
 	if err != nil {
 		return Loaded{}, err
 	}
@@ -171,10 +171,6 @@ func (m file) modelConfigs() ([]modeladapter.Config, error) {
 		if !ok {
 			return nil, fmt.Errorf("%w: model %q references unknown provider %q", ErrInvalidManifest, name, candidate.Provider)
 		}
-		if providerConfig.Kind != "ollama" {
-			return nil, fmt.Errorf("%w: provider kind %q is not supported by the current runtime", ErrInvalidManifest, providerConfig.Kind)
-		}
-
 		cfg := modeladapter.Config{
 			ID:              name,
 			ProviderID:      candidate.Provider,
@@ -189,6 +185,9 @@ func (m file) modelConfigs() ([]modeladapter.Config, error) {
 		}
 		if err := cfg.Validate(); err != nil {
 			return nil, err
+		}
+		if providerConfig.Kind != "ollama" {
+			return nil, fmt.Errorf("%w: provider kind %q is not supported by the current runtime", ErrInvalidManifest, providerConfig.Kind)
 		}
 		models = append(models, cfg)
 	}
